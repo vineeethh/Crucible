@@ -1,0 +1,73 @@
+id: retail_orders_2024_v1
+kind: dataset_fixture
+version: 1.0.0
+file: retail_orders_2024_v1.csv
+sha256: "f93ef6fd1925ea44cb271e2c9f389e124c1a776eb080c0fa6b87b5b7b63283b2"
+rows: 608
+# dtypes verified against polars.read_csv(infer_schema_length=10000).
+# NOTE: every column is numeric. There is no text column in this fixture, and in
+# particular no `ShippingStatus` and no string-valued region name — see
+# `task_list_mismatches` below.
+columns:
+  - {name: OrderID, dtype: Int64}
+  - {name: RegionCode, dtype: Int64}
+  - {name: CategoryCode, dtype: Int64}
+  - {name: ProductCode, dtype: Int64}
+  - {name: SalesRepID, dtype: Int64}
+  - {name: Month, dtype: Int64}
+  - {name: Year, dtype: Int64}
+  - {name: Quantity, dtype: Float64}
+  - {name: UnitPrice, dtype: Float64}
+  - {name: DiscountPct, dtype: Int64}
+  - {name: ShippingDays, dtype: Int64}
+  - {name: CustomerAge, dtype: Int64}
+  - {name: Rating, dtype: Float64}
+provenance:
+  source: "Supplied by the project owner on 2026-08-20 as a testing dataset."
+  license: "Owner-supplied; treated as project-internal synthetic test data."
+  pii: none
+  sensitive: false
+  note: >
+    Codes only (RegionCode, CategoryCode, ProductCode, SalesRepID) with no
+    lookup table shipped, so no region/category/product/rep NAME can be
+    resolved. Answers to grouped questions are codes, not labels.
+
+# Data-quality facts, each verified by the reference calculator's `_anomalies`
+# block so the manifest and the calculator cannot silently drift apart.
+data_quality:
+  missing_cells:
+    - "Quantity: 23 null"
+    - "UnitPrice: 15 null"
+    - "Rating: 13 null"
+    - "all other columns: 0 null"
+  exact_duplicate_rows: 8
+  duplicate_order_ids: 8 # 608 rows, 600 distinct OrderID — the same 8 rows
+  anomalies:
+    - "Quantity outliers: 4 rows at 100/150/250/500 against a legitimate 1-12
+       range (OrderIDs 100031, 100042, 100145, 100547). These dominate
+       sum(Quantity) and mean(Quantity), which is why the reference calculator
+       records both under `_unusable` and the suite has no gold for either."
+    - "ShippingDays: 1 row at -14 (OrderID 100563) — physically impossible."
+    - "DiscountPct is expressed in PERCENTAGE POINTS (0/5/10/15/20), not as a
+       fraction. Any revenue formula must divide by 100."
+
+intentional_edge_cases:
+  - "missing_count on OrderID is 0 — the agent must report 0, not invent a
+     non-zero count."
+  - "count_distinct on OrderID (600) differs from row_count (608); the gap is
+     exactly the 8 duplicate rows."
+  - "All grouped cases were margin-checked: no tie, so none is ambiguous."
+
+# Why the accompanying suite is mostly abstention cases.
+task_list_mismatches:
+  - "The submitted task list references `ShippingStatus` and 'region casing'.
+     Neither exists: the fixture has no text column at all. Cases derived from
+     those tasks assert abstention on a non-existent column."
+  - "The submitted formula `Quantity x UnitPrice x (1 - DiscountPct)` yields
+     negative revenue for every discounted row because DiscountPct is 0-20, not
+     0.0-0.2. The corrected form is `(1 - DiscountPct/100)`."
+  - "Six of the seven submitted tasks (cleaning, derived columns, top-N,
+     multi-row trends, anomaly flagging, Excel export) are outside the agent's
+     bounded operation set, so the honest outcome for each is abstention."
+
+reference: evals/references/retail_orders_2024_v1_reference.py

@@ -1,0 +1,41 @@
+id: seed
+version: 0.1.0
+purpose: smoke            # this seed suite becomes the nucleus of the PR smoke suite
+status: released          # frozen; additions create suite v0.2.0, never in-place edits
+created: "2026-07-14"
+description: >
+  Phase 0 hand-verified seed suite for the Crucible reference workload:
+  question answering over an uploaded tabular dataset. Every case pins the
+  fixture content hash, an executable reference oracle, declared
+  canonicalization, and verification provenance. This suite is the first
+  release-gate evidence artifact; it must catch a deliberately introduced
+  regression before Phase 5 declares the eval harness done.
+dataset_fixtures:
+  - id: retail_sales_v1
+    sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+cases:                     # pinned case versions — suite membership is by version
+  - {id: seed-01-total-net-revenue,      version: 1.0.0, oracle: numeric_exact_with_tolerance}
+  - {id: seed-02-top-region-q2,          version: 1.0.0, oracle: exact_value}
+  - {id: seed-03-electronics-bulk-orders, version: 1.0.0, oracle: exact_value}
+  - {id: seed-04-avg-unit-price-furniture, version: 1.0.0, oracle: numeric_exact_with_tolerance}
+  - {id: seed-05-march-order-count,      version: 1.0.0, oracle: exact_value}
+  - {id: seed-06-top-product-by-quantity, version: 1.0.0, oracle: exact_value}
+  - {id: seed-07-missing-discount-count, version: 1.0.0, oracle: exact_value}
+  - {id: seed-08-distinct-customers,     version: 1.0.0, oracle: exact_value}
+  - {id: seed-09-net-sales-by-region,    version: 1.0.0, oracle: result_set_match}
+  - {id: seed-10-invalid-profit-margin,  version: 1.0.0, oracle: behavioral}
+coverage:
+  capabilities: [aggregate, group_by, filter, date_filter, argmax, distinct,
+                 missing_values, table_answer, order_insensitive, abstention]
+  deliberate_gaps_for_later_suites: [joins_across_files, wide_tables, large_files,
+                                     paraphrase_robustness, prompt_injection_cells,
+                                     locale_number_formats, ambiguous_questions_needing_clarification]
+scoring_policy:
+  primary_gate: "Tier 1 deterministic oracle per case; a judge or prose score can never override a failed oracle."
+  secondary: "policy checks (code_executed, no_network, provenance_present, result_schema_valid) are hard gates"
+governance:
+  rebaseline: "Requires an explicit reviewed PR with rationale; never silent."
+  mutation: "Released cases and this manifest are immutable; changes create new versions with lineage."
+verification_evidence:
+  run: "python evals/references/run_all.py  (all 10 pass, 2026-07-14, Python 3.14.2)"
+  independent_check: "evals/references/independent_check_hv.py agrees with seed-01 and seed-02 primaries"

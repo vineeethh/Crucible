@@ -1,0 +1,98 @@
+{
+  "suite_id": "employee-performance",
+  "suite_version": "0.1.0",
+  "suite_hash": "773b88d7c8c396b53ba5f6ad17b9f43e7b41879c1750deecc8c11e84e893b56e",
+  "config_id": "reference@1",
+  "config_hash": "f5fa1af5944017ef",
+  "accuracy": 0.8095,
+  "tolerance": 0.02,
+  "approved_by": "vishnuvardhan5336@gmail.com",
+  "approved_at": "2026-08-20",
+  "notes": "Initial test of employee_performance_2024 against the unmodified system",
+  "per_case": {
+    "ep-row-count": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-dedupe-count": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-missing-performance-score": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-missing-engagement-score": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-missing-training-hours": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-sentinel-999-with-where": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-mean-performance-by-department": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-mean-engagement-by-department": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-mean-performance-by-joblevel": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-mean-engagement-by-joblevel": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-mean-years-by-department": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-mean-salaryband-by-department": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-abstain-headcount-by-department": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-abstain-correlation-overtime": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-abstain-correlation-absence": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-abstain-attrition-risk": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-abstain-outlier-iqr": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ep-finding-999-no-where": {
+      "correct": false,
+      "policy_ok": true
+    },
+    "ep-finding-negative-no-where": {
+      "correct": false,
+      "policy_ok": true
+    },
+    "ep-finding-ranking-with-qualifier": {
+      "correct": false,
+      "policy_ok": false
+    },
+    "ep-finding-summary-table-per-phrasing": {
+      "correct": false,
+      "policy_ok": false
+    }
+  }
+}

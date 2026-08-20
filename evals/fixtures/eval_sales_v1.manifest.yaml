@@ -1,0 +1,22 @@
+id: eval_sales_v1
+kind: dataset_fixture
+version: 1.0.0
+file: eval_sales_v1.csv
+sha256: "f869596579dd748ba649df72d4583f57a254aa7c1b8f670700105d6d6d8dfdfd"
+rows: 9
+# dtypes match polars.read_csv inference; the agent's planner uses them to pick
+# numeric vs categorical columns.
+columns:
+  - {name: region, dtype: String}
+  - {name: category, dtype: String}
+  - {name: units, dtype: Int64}
+  - {name: price, dtype: Float64}
+  - {name: rep, dtype: String}
+provenance:
+  source: "Fully synthetic; hand-authored for the Phase 5 evaluation harness on 2026-07-17."
+  license: "Project-owned synthetic data; no real persons, prices, or transactions."
+  pii: none
+intentional_edge_cases:
+  - "1 empty price cell (row 7) and 1 empty units cell (row 8) for missing-value cases"
+  - "group totals are all distinct (no ties) so max/min-by-group answers are unambiguous"
+reference: evals/references/eval_sales_v1_reference.py

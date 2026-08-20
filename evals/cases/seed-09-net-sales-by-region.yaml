@@ -1,0 +1,29 @@
+id: seed-09-net-sales-by-region
+version: 1.0.0
+suite: seed
+status: released
+dataset:
+  id: retail_sales_v1
+  sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+question: "What are the total net sales for each region?"
+answer_contract:
+  kind: table
+  key_column: region
+  canonicalization: "region trim_lowercase; order-insensitive comparison keyed by region; net sales abs_tol 0.01"
+oracle:
+  type: result_set_match
+  expected:
+    - {region: east,  net_sales: 3066.00}
+    - {region: north, net_sales: 5317.50}
+    - {region: south, net_sales: 3144.00}
+    - {region: west,  net_sales: 7050.50}
+  abs_tol: 0.01
+  reference_artifact: references/case_09_net_sales_by_region.py
+verification:
+  method: "reference program + consistency check: region totals sum to 18578.00 = seed-01 grand total 18833.00 minus the unknown-region row ORD-1023 (255.00)"
+  verified_by: "project owner, 2026-07-14"
+notes: "Unknown-region row is excluded from grouping by contract. Row order carries no meaning; comparison must be order-insensitive."
+secondary_checks: [code_executed, no_network, provenance_present, result_schema_valid]
+policy: {max_attempts: 3, max_wall_seconds: 25, max_cost_usd: 0.04}
+tags: [group_by, table_answer, order_insensitive, null_region_exclusion]
+strongest_oracle_note: "Tier 1 deterministic result-set oracle (order-insensitive table match with tolerance)."

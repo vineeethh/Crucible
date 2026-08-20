@@ -1,0 +1,25 @@
+id: seed-02-top-region-q2
+version: 1.0.0
+suite: seed
+status: released
+dataset:
+  id: retail_sales_v1
+  sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+question: "Which region had the highest net sales in Q2 2024?"
+answer_contract:
+  kind: categorical_scalar
+  canonicalization: trim_lowercase
+  domain: [north, south, east, west]
+oracle:
+  type: exact_value
+  expected: "west"
+  reference_artifact: references/case_02_top_region_q2.py
+  independent_check: references/independent_check_hv.py   # agrees: west, margin 3921.50 over East
+verification:
+  method: "primary reference + independent second calculation; winning margin 3921.50, so no tie sensitivity"
+  verified_by: "project owner, 2026-07-14"
+notes: "Q2 2024 = 2024-04-01..2024-06-30 inclusive. Unknown-region row ORD-1023 falls in Q2 and must be excluded from grouping."
+secondary_checks: [code_executed, no_network, provenance_present, result_schema_valid]
+policy: {max_attempts: 3, max_wall_seconds: 20, max_cost_usd: 0.03}
+tags: [aggregate, date_filter, group_by, null_region_exclusion]
+strongest_oracle_note: "Tier 1 deterministic result oracle (exact categorical)."

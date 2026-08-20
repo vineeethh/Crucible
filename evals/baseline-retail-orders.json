@@ -1,0 +1,146 @@
+{
+  "suite_id": "retail-orders",
+  "suite_version": "0.1.0",
+  "suite_hash": "0a7f7d4e1aba2c3d05df18d39c37651a1f55d1ec6427f900dff66bfd94de59e0",
+  "config_id": "reference@1",
+  "config_hash": "f5fa1af5944017ef",
+  "accuracy": 1.0,
+  "tolerance": 0.02,
+  "approved_by": "vishnuvardhan5336@gmail.com",
+  "approved_at": "2026-08-20",
+  "notes": "Add DEDUPE and RANK_TOP_N: domain-agnostic dedupe count and top-N ranking, both TABLE/artifact-backed like group_aggregate",
+  "per_case": {
+    "ro-row-count": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-sum-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-sum-shipping-days": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-mean-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-mean-rating": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-mean-customer-age": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-mean-discount-pct": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-distinct-order-id": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-distinct-product": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-distinct-sales-rep": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-distinct-region": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-distinct-month": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-missing-quantity": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-missing-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-missing-rating": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-missing-order-id": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-max-region-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-min-region-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-max-category-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-max-sales-rep-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-max-product-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-max-month-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-revenue-by-region": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-guard-sum-order-id": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-dedupe-count": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-top5-products-by-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-top3-reps-by-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-abstain-clean-dedupe": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-abstain-no-shipping-status": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-abstain-total-sales": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-abstain-top-5-products": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-abstain-mom-trend": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "ro-abstain-flag-anomalies": {
+      "correct": true,
+      "policy_ok": true
+    }
+  }
+}

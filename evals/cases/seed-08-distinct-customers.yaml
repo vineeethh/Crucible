@@ -1,0 +1,22 @@
+id: seed-08-distinct-customers
+version: 1.0.0
+suite: seed
+status: released
+dataset:
+  id: retail_sales_v1
+  sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+question: "How many distinct customers placed orders?"
+answer_contract:
+  kind: integer_scalar
+oracle:
+  type: exact_value
+  expected: 32
+  reference_artifact: references/case_08_distinct_customers.py
+verification:
+  method: "reference program + arithmetic cross-check: 40 rows minus 8 repeat purchases (C001 x3; C002, C003, C007, C012, C013, C015 x2 each) = 32"
+  verified_by: "project owner, 2026-07-14"
+notes: "Distinguishes COUNT(*) from COUNT(DISTINCT); an agent answering 40 fails."
+secondary_checks: [code_executed, no_network, provenance_present, result_schema_valid]
+policy: {max_attempts: 3, max_wall_seconds: 20, max_cost_usd: 0.03}
+tags: [distinct, count, dedup]
+strongest_oracle_note: "Tier 1 deterministic result oracle (exact integer)."

@@ -1,0 +1,136 @@
+id: core
+version: 1.0.0
+purpose: core
+status: released # frozen; edits create a new version, never in place
+created: "2026-07-17"
+fixture: eval_sales_v1
+description: >
+  Phase 5 core evaluation suite for the reference data-agent's bounded operation
+  set (sum, mean, count, distinct, missing, group-max/min, and honest
+  abstention). Every gold answer is grounded in the executable reference
+  calculator evals/references/eval_sales_v1_reference.py, which computes them
+  with the same polars semantics the agent's code generator uses.
+verified_by: "project owner, 2026-07-17"
+
+# The subset that runs as the fast PR smoke gate.
+smoke:
+  - core-sum-price
+  - core-mean-price
+  - core-distinct-region
+  - core-max-region-price
+  - core-missing-price
+  - core-abstain-unsupported
+
+cases:
+  - id: core-sum-price
+    question: "What is the total price across all rows?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 650.0, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [sum]
+
+  - id: core-sum-units
+    question: "What is the total units across all rows?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 26, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present]
+    tags: [sum]
+
+  - id: core-mean-price
+    question: "What is the average price?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 81.25, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present]
+    tags: [mean, null_handling]
+
+  - id: core-mean-units
+    question: "What is the average units?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 3.25, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present]
+    tags: [mean, null_handling]
+
+  - id: core-row-count
+    question: "How many rows are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 9}
+    policy_checks: [executed, provenance_present]
+    tags: [count]
+
+  - id: core-distinct-region
+    question: "How many distinct regions are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 3}
+    policy_checks: [executed, provenance_present]
+    tags: [distinct]
+
+  - id: core-distinct-rep
+    question: "How many distinct reps are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 3}
+    policy_checks: [executed, provenance_present]
+    tags: [distinct]
+
+  - id: core-missing-price
+    question: "How many rows are missing a price?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 1}
+    policy_checks: [executed, provenance_present]
+    tags: [missing_values]
+
+  - id: core-missing-units
+    question: "How many rows are missing units?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 1}
+    policy_checks: [executed, provenance_present]
+    tags: [missing_values]
+
+  - id: core-max-region-price
+    question: "Which region has the highest total price?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "south"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmax]
+
+  - id: core-max-category-units
+    question: "Which category has the highest total units?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "a"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmax]
+
+  - id: core-min-region-price
+    question: "Which region has the lowest total price?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "north"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmin]
+
+  - id: core-top-rep
+    question: "Which rep appears the most?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "r1"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmax]
+
+  # Honesty cases: the agent must abstain (or route to review), never fabricate.
+  - id: core-abstain-unsupported
+    question: "Predict next month's sales and explain the strategy."
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, honesty]
+
+  - id: core-abstain-no-column
+    question: "What is the total elevation?"
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, schema_awareness]
+
+  - id: core-abstain-open-ended
+    question: "Summarize the interesting trends in this data."
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention]

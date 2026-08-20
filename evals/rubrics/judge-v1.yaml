@@ -1,0 +1,30 @@
+id: judge-rubric
+version: 1.0.0
+status: released
+description: >
+  Frozen rubric for the LLM-as-a-judge. The judge scores EXPLANATION QUALITY
+  only; the numeric answer has a deterministic oracle and the judge can never
+  override it (metric contract, ADR-005). Each dimension is scored 0/1/2 and
+  reported as a secondary trend, calibrated against held-out human labels.
+dimensions:
+  groundedness:
+    0: "Contradicts the computed result or invents a computation."
+    1: "Partly tied to the computed result."
+    2: "Accurately describes the computed result and its limitations."
+  provenance:
+    0: "No reference to data or result."
+    1: "Vague reference."
+    2: "Names the relevant columns/operation and the computed artifact."
+  usefulness:
+    0: "Does not answer the request or is misleading."
+    1: "Answers but is unclear or overlong."
+    2: "Direct, concise, answers the requested form."
+  uncertainty:
+    0: "Claims certainty despite failure or ambiguity."
+    1: "Mentions a caveat incompletely."
+    2: "Abstains, asks, or clearly states the limitation when warranted."
+bias_controls:
+  - "Judge is blind to model/provider identity."
+  - "Use a different model family from the generator where feasible (bias reduction, not independence)."
+  - "Add a concision criterion so length is not a hidden reward."
+  - "The judge's score is diagnostic metadata, never a correctness gate."

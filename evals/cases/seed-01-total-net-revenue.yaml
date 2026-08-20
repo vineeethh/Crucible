@@ -1,0 +1,25 @@
+id: seed-01-total-net-revenue
+version: 1.0.0
+suite: seed
+status: released          # immutable; edits create a new version
+dataset:
+  id: retail_sales_v1
+  sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+question: "What is the total net revenue across all orders, after discounts?"
+answer_contract:
+  kind: numeric_scalar
+  unit: USD
+  canonicalization: "net = quantity * unit_price * (1 - discount); missing discount = 0; all 40 rows included"
+oracle:
+  type: numeric_exact_with_tolerance
+  expected: 18833.00
+  abs_tol: 0.01
+  reference_artifact: references/case_01_total_net_revenue.py
+  independent_check: references/independent_check_hv.py   # second calculation agrees: 18833.00
+verification:
+  method: "primary reference + independently written second calculation (different parser/accumulation)"
+  verified_by: "project owner, 2026-07-14"
+secondary_checks: [code_executed, no_network, provenance_present, result_schema_valid]
+policy: {max_attempts: 3, max_wall_seconds: 20, max_cost_usd: 0.03}
+tags: [aggregate, discount_handling, missing_values]
+strongest_oracle_note: "Tier 1 deterministic result oracle (exact numeric with tolerance)."

@@ -1,0 +1,56 @@
+id: employee_performance_2024
+kind: dataset_fixture
+version: 1.0.0
+file: employee_performance_2024.csv
+sha256: "cef340dc86817962c3dc77542df838c2514ab068e20de83f15151accc4c06ff3"
+rows: 557
+# dtypes verified against polars.read_csv(infer_schema_length=10000).
+columns:
+  - {name: EmployeeID, dtype: Int64}
+  - {name: DepartmentCode, dtype: Int64}
+  - {name: JobLevel, dtype: Int64}
+  - {name: ManagerID, dtype: Int64}
+  - {name: YearsAtCompany, dtype: Float64}
+  - {name: MonthlyHoursWorked, dtype: Int64}
+  - {name: ProjectsCompleted, dtype: Int64}
+  - {name: TrainingHoursCompleted, dtype: Float64}
+  - {name: PerformanceScore, dtype: Float64}
+  - {name: AbsenceDays, dtype: Int64}
+  - {name: OvertimeHours, dtype: Float64}
+  - {name: SalaryBand, dtype: Int64}
+  - {name: EngagementScore, dtype: Float64}
+provenance:
+  source: "Supplied by the project owner on 2026-08-20 as a testing dataset."
+  license: "Owner-supplied; treated as project-internal synthetic test data."
+  pii: "EmployeeID/ManagerID are synthetic integer codes, no names or contact info."
+  sensitive: false
+
+data_quality:
+  missing_cells:
+    - "TrainingHoursCompleted: 8 null"
+    - "PerformanceScore: 12 null"
+    - "EngagementScore: 10 null"
+    - "all other columns: 0 null"
+  exact_duplicate_rows: 7
+  anomalies:
+    - "MonthlyHoursWorked: 8 rows carry the value 999 — a sentinel, not a real
+       hours figure (a real month tops out around 200-240 hours); the task
+       brief itself calls this out."
+    - "AbsenceDays: 7 rows are negative (down to -22) — physically impossible,
+       flagged as invalid rather than corrected (no stated correction rule)."
+    - "OvertimeHours: one row (EmployeeID 5420) is 393.0 against a legitimate
+       ~0-40 range — a clear data-entry error, left in and flagged, not
+       silently dropped."
+
+capability_notes: >
+  Every task in the accompanying brief was checked against the agent's actual
+  operation set (evals/suites/employee-performance-v0.1.0.yaml has the full
+  breakdown, case by case). In short: detection/counting-style requests
+  (missing values per column, duplicate rows, sentinel/negative-value counts,
+  mean-by-group breakdowns, top-N rankings) are answerable. Requests requiring
+  statistics the agent has no operation for (correlation, IQR/z-score outlier
+  detection), a qualifier on a ranking (minimum team size before a manager
+  counts), or a custom multi-condition rule (attrition-risk flagging) are not
+  — the agent abstains on those rather than approximating them.
+
+reference: evals/references/employee_performance_2024_reference.py

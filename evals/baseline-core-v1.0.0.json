@@ -1,0 +1,78 @@
+{
+  "suite_id": "core",
+  "suite_version": "1.0.0",
+  "suite_hash": "9bd412a403defacf6bf2d39b2402f03b8965a7aaf6f66fdb888229f833be8ca1",
+  "config_id": "reference@1",
+  "config_hash": "f5fa1af5944017ef",
+  "accuracy": 1.0,
+  "tolerance": 0.02,
+  "approved_by": "project owner",
+  "approved_at": "2026-07-17",
+  "notes": "Phase 5 initial baseline; reference config (fake planner + docker sandbox).",
+  "per_case": {
+    "core-sum-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-sum-units": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-mean-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-mean-units": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-row-count": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-distinct-region": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-distinct-rep": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-missing-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-missing-units": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-max-region-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-max-category-units": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-min-region-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-top-rep": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-abstain-unsupported": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-abstain-no-column": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "core-abstain-open-ended": {
+      "correct": true,
+      "policy_ok": true
+    }
+  }
+}

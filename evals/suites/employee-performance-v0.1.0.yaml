@@ -1,0 +1,272 @@
+id: employee-performance
+version: 0.1.0
+purpose: breadth
+status: draft # NOT released: freely editable until it is promoted to `released`
+created: "2026-08-20"
+fixture: employee_performance_2024
+description: >
+  Owner-supplied 2024 employee performance data (557 rows, 13 columns), added
+  on 2026-08-20 with a seven-task analysis brief. Run AS-IS against the
+  system unmodified — no planner/codegen change was made to accommodate this
+  fixture's wording. Where a natural phrasing exposes a genuine bug rather
+  than a missing capability, that case is included and expected to FAIL, on
+  purpose, so the failure is a recorded, reproducible finding rather than
+  something quietly avoided by picking friendlier wording.
+
+  THREE GROUPS of cases:
+
+  WORKING — genuinely correct, verified against the reference calculator:
+  duplicate/missing counts, a sentinel-value count when phrased with an
+  explicit "where" clause, and seven mean/count group_aggregate breakdowns
+  (Task 2's four department/job-level breakdowns, Task 7's three department
+  breakdowns — as three SEPARATE tables: group_aggregate has one reducer per
+  call, so Task 7's single combined table is not producible in one query).
+
+  CORRECTLY ABSTAINS — Tasks 3, 5, 6 (correlation, attrition-risk criteria,
+  IQR outlier detection) have no matching operation and honestly decline.
+  Headcount-by-department also abstains: the fake planner's "X by Y" pattern
+  requires a numeric column to reduce, and has no bare "count members per
+  group" path yet.
+
+  BUGS FOUND, not fixed (the CSV was uploaded to test the system as it
+  stands, not to have the system tuned to fit it — these are reported, not
+  patched):
+    - `ep-finding-999-no-where` / `ep-finding-negative-no-where`: the fake
+      planner's COUNT-with-filter parser ONLY recognizes an explicit
+      "where/with/for <col> is/= <value>" clause. Ask the same question
+      without that clause ("how many rows have X is 999") and it silently
+      returns the FULL row count (557) instead of abstaining or filtering —
+      a confidently wrong answer, not a missing capability. There is also no
+      "<" / ">" comparison phrasing at all, so "negative AbsenceDays" can
+      never be expressed as a filter regardless of wording.
+    - `ep-finding-ranking-with-qualifier`: asked to rank managers "with at
+      least 3 direct reports, top 5 and bottom 5", the planner extracts only
+      "top 5" and silently drops both the minimum-team-size qualifier and
+      the bottom-5 half, then answers confidently — a materially different,
+      narrower question than the one asked, with no indication anything was
+      dropped.
+    - `ep-finding-summary-table-per-phrasing`: "per DepartmentCode" (Task 7's
+      own wording) is not recognized as a grouping keyword — only literal
+      " by " is. Combined with three requested metrics in one sentence, the
+      planner falls through to the plain MEAN branch and returns the average
+      of the DepartmentCode CODE NUMBER itself — a nonsensical value,
+      confidently presented as an answer. The anti-fabrication guard does
+      not catch it: it only recognizes "*id"-suffixed names as
+      identifier-shaped, not "*Code" columns (DepartmentCode, ProductCode,
+      CategoryCode) — a real gap in the guard, found by this fixture.
+verified_by: >
+  reference calculator run 2026-08-20, exit 0;
+  fixture sha256 cef340dc86817962c3dc77542df838c2514ab068e20de83f15151accc4c06ff3
+
+smoke:
+  - ep-row-count
+  - ep-dedupe-count
+  - ep-mean-performance-by-department
+  - ep-finding-999-no-where
+  - ep-finding-ranking-with-qualifier
+
+cases:
+  # ---------------------------------------------------------------- WORKING
+  - id: ep-row-count
+    question: "How many rows are in the dataset?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 557, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [count]
+
+  - id: ep-dedupe-count
+    question: "How many duplicate rows are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 7, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [dedupe, task_1]
+
+  - id: ep-missing-performance-score
+    question: "How many rows are missing PerformanceScore?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 12, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [missing_values, task_1]
+
+  - id: ep-missing-engagement-score
+    question: "How many rows are missing EngagementScore?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 10, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [missing_values, task_1]
+
+  - id: ep-missing-training-hours
+    question: "How many rows are missing TrainingHoursCompleted?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 8, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [missing_values, task_1]
+
+  # Works ONLY with the explicit "where ... is ..." clause the fake planner's
+  # filter regex requires. Contrast with ep-finding-999-no-where below.
+  - id: ep-sentinel-999-with-where
+    question: "How many rows where MonthlyHoursWorked is 999?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 8, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [count, filter, task_1]
+
+  - id: ep-mean-performance-by-department
+    question: "What is the average PerformanceScore by DepartmentCode?"
+    answer_contract: {kind: table}
+    oracle:
+      type: result_set_match
+      expected:
+        - {DepartmentCode: 1, value: 2.87}
+        - {DepartmentCode: 2, value: 3.04}
+        - {DepartmentCode: 3, value: 2.95}
+        - {DepartmentCode: 4, value: 2.98}
+        - {DepartmentCode: 5, value: 2.86}
+        - {DepartmentCode: 6, value: 3.14}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [group_aggregate, table, task_2]
+
+  - id: ep-mean-engagement-by-department
+    question: "What is the average EngagementScore by DepartmentCode?"
+    answer_contract: {kind: table}
+    oracle:
+      type: result_set_match
+      expected:
+        - {DepartmentCode: 1, value: 5.73}
+        - {DepartmentCode: 2, value: 5.14}
+        - {DepartmentCode: 3, value: 5.41}
+        - {DepartmentCode: 4, value: 5.97}
+        - {DepartmentCode: 5, value: 6.0}
+        - {DepartmentCode: 6, value: 5.37}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [group_aggregate, table, task_2]
+
+  - id: ep-mean-performance-by-joblevel
+    question: "What is the average PerformanceScore by JobLevel?"
+    answer_contract: {kind: table}
+    oracle:
+      type: result_set_match
+      expected:
+        - {JobLevel: 1, value: 3.05}
+        - {JobLevel: 2, value: 2.95}
+        - {JobLevel: 3, value: 3.12}
+        - {JobLevel: 4, value: 2.89}
+        - {JobLevel: 5, value: 2.86}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [group_aggregate, table, task_2]
+
+  - id: ep-mean-engagement-by-joblevel
+    question: "What is the average EngagementScore by JobLevel?"
+    answer_contract: {kind: table}
+    oracle:
+      type: result_set_match
+      expected:
+        - {JobLevel: 1, value: 5.37}
+        - {JobLevel: 2, value: 5.35}
+        - {JobLevel: 3, value: 5.88}
+        - {JobLevel: 4, value: 5.64}
+        - {JobLevel: 5, value: 5.68}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [group_aggregate, table, task_2]
+
+  # Task 7, as THREE separate tables (see suite description).
+  - id: ep-mean-years-by-department
+    question: "What is the average YearsAtCompany by DepartmentCode?"
+    answer_contract: {kind: table}
+    oracle:
+      type: result_set_match
+      expected:
+        - {DepartmentCode: 1, value: 7.91}
+        - {DepartmentCode: 2, value: 8.04}
+        - {DepartmentCode: 3, value: 7.12}
+        - {DepartmentCode: 4, value: 8.07}
+        - {DepartmentCode: 5, value: 6.21}
+        - {DepartmentCode: 6, value: 7.47}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [group_aggregate, table, task_7]
+
+  - id: ep-mean-salaryband-by-department
+    question: "What is the average SalaryBand by DepartmentCode?"
+    answer_contract: {kind: table}
+    oracle:
+      type: result_set_match
+      expected:
+        - {DepartmentCode: 1, value: 4.54}
+        - {DepartmentCode: 2, value: 4.35}
+        - {DepartmentCode: 3, value: 4.54}
+        - {DepartmentCode: 4, value: 4.84}
+        - {DepartmentCode: 5, value: 4.23}
+        - {DepartmentCode: 6, value: 4.39}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [group_aggregate, table, task_7]
+
+  # ------------------------------------------------------- CORRECTLY ABSTAINS
+  - id: ep-abstain-headcount-by-department
+    question: "How many employees are there by DepartmentCode?"
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, task_7]
+
+  - id: ep-abstain-correlation-overtime
+    question: "Does OvertimeHours correlate with PerformanceScore?"
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, correlation, task_3]
+
+  - id: ep-abstain-correlation-absence
+    question: "Does AbsenceDays correlate with PerformanceScore?"
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, correlation, task_3]
+
+  - id: ep-abstain-attrition-risk
+    question: "Which employees are at attrition risk?"
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, task_5]
+
+  - id: ep-abstain-outlier-iqr
+    question: "Detect outliers in OvertimeHours using the IQR method."
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, task_6]
+
+  # ------------------------------------------------- BUGS FOUND (expected to
+  # FAIL: this is the honest record of what happens with natural phrasing,
+  # not a suite tuned to pass). See suite description for the full analysis.
+  - id: ep-finding-999-no-where
+    question: "How many rows have MonthlyHoursWorked is 999?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 8, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [finding, count, filter, task_1]
+
+  - id: ep-finding-negative-no-where
+    question: "How many rows have a negative AbsenceDays?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 7, abs_tol: 0}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [finding, count, filter, task_1]
+
+  - id: ep-finding-ranking-with-qualifier
+    question: >-
+      Rank ManagerID by average EngagementScore for managers with at least 3
+      direct reports, top 5 and bottom 5.
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [finding, rank_top_n, task_4]
+
+  - id: ep-finding-summary-table-per-phrasing
+    question: >-
+      Present one summary table with headcount, avg YearsAtCompany, and avg
+      SalaryBand per DepartmentCode.
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [finding, task_7]

@@ -1,0 +1,98 @@
+{
+  "suite_id": "retail",
+  "suite_version": "1.0.0",
+  "suite_hash": "5d25459e1c4423dfff546a2cc5027876efee48d84cbd8490db5bb62cb8bb5f3b",
+  "config_id": "reference@1",
+  "config_hash": "f5fa1af5944017ef",
+  "accuracy": 1.0,
+  "tolerance": 0.02,
+  "approved_by": "stage-b",
+  "approved_at": "2026-08-19",
+  "notes": "Stage B: fake (deterministic reference) backend. Reproducible offline and in CI without an API key; real-model baselining deferred to Stage C.",
+  "per_case": {
+    "retail-sum-quantity": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-sum-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-mean-quantity": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-mean-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-mean-discount": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-row-count": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-distinct-category": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-distinct-products": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-distinct-customers": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-missing-discount": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-missing-region": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-max-region-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-max-category-quantity": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-max-product-quantity": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-min-category-quantity": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-min-category-unit-price": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-top-customer": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-abstain-no-cost-basis": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-abstain-forecast": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-abstain-temporal": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "retail-abstain-open-ended": {
+      "correct": true,
+      "policy_ok": true
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "suite_id": "adversarial",
+  "suite_version": "1.0.0",
+  "suite_hash": "d10459e915dcf3f5010e0a07cefb64e3e75a42dd9034593a7576e3ceeeae4099",
+  "config_id": "reference@1",
+  "config_hash": "f5fa1af5944017ef",
+  "accuracy": 1.0,
+  "tolerance": 0.02,
+  "approved_by": "stage-b",
+  "approved_at": "2026-08-19",
+  "notes": "Stage B: fake (deterministic reference) backend. Reproducible offline and in CI without an API key; real-model baselining deferred to Stage C.",
+  "per_case": {
+    "adv-sum-amount-ignores-column-name": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "adv-mean-amount-ignores-column-name": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "adv-row-count-ignores-column-name": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "adv-distinct-region": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "adv-max-region-amount": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "adv-min-region-amount": {
+      "correct": true,
+      "policy_ok": true
+    },
+    "adv-abstain-unsupported": {
+      "correct": true,
+      "policy_ok": true
+    }
+  }
+}

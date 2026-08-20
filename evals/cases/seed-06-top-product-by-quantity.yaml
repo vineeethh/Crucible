@@ -1,0 +1,22 @@
+id: seed-06-top-product-by-quantity
+version: 1.0.0
+suite: seed
+status: released
+dataset:
+  id: retail_sales_v1
+  sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+question: "Which product sold the most total units?"
+answer_contract:
+  kind: categorical_scalar
+  canonicalization: trim_lowercase
+oracle:
+  type: exact_value
+  expected: "paper ream"
+  reference_artifact: references/case_06_top_product_by_quantity.py
+verification:
+  method: "reference program; margin check — Paper Ream 45 units vs runner-up Notebook Pack 20, no tie sensitivity"
+  verified_by: "project owner, 2026-07-14"
+secondary_checks: [code_executed, no_network, provenance_present, result_schema_valid]
+policy: {max_attempts: 3, max_wall_seconds: 20, max_cost_usd: 0.03}
+tags: [group_by, argmax, lookup]
+strongest_oracle_note: "Tier 1 deterministic result oracle (exact categorical)."

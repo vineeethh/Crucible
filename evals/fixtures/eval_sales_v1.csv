@@ -1,0 +1,10 @@
+region,category,units,price,rep
+north,A,5,100.0,r1
+north,B,3,50.0,r2
+south,A,2,200.0,r1
+south,B,4,80.0,r3
+east,A,6,30.0,r2
+east,B,1,90.0,r1
+north,A,2,,r1
+south,B,,40.0,r2
+east,A,3,60.0,r3

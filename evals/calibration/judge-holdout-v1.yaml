@@ -1,0 +1,98 @@
+id: judge-holdout
+version: 1.0.0
+rubric: judge-rubric@1
+status: released
+description: >
+  Held-out, human-labeled examples for judge calibration. Stratified across
+  grounded/ungrounded explanations, correct-but-terse, verbose, abstentions, and
+  adversarial verbosity (study guide §4.4). Human labels are the ground truth the
+  judge is measured against; they were NOT used to tune the judge.
+labeled_by: "project owner, 2026-07-18"
+items:
+  - id: h01  # grounded, concise, cites value + column
+    question: "What is the total price?"
+    answer_contract: numeric_scalar
+    verified_result: {value: 650.0}
+    explanation: "The sum over the price column is 650.0."
+    human: {groundedness: 2, provenance: 2, usefulness: 2, uncertainty: 0}
+
+  - id: h02  # grounded but vague on provenance
+    question: "What is the total price?"
+    answer_contract: numeric_scalar
+    verified_result: {value: 650.0}
+    explanation: "The computed total is 650.0."
+    human: {groundedness: 2, provenance: 1, usefulness: 2, uncertainty: 0}
+
+  - id: h03  # ungrounded / invented
+    question: "What is the total price?"
+    answer_contract: numeric_scalar
+    verified_result: {value: 650.0}
+    explanation: "Sales look strong this quarter and are trending up."
+    human: {groundedness: 0, provenance: 0, usefulness: 0, uncertainty: 0}
+
+  - id: h04  # correct group answer, cites columns
+    question: "Which region has the highest total price?"
+    answer_contract: categorical_scalar
+    verified_result: {value: "south"}
+    explanation: "Grouped over the region column by summed price, south is highest."
+    human: {groundedness: 2, provenance: 2, usefulness: 2, uncertainty: 0}
+
+  - id: h05  # honest abstention with a clear limitation
+    question: "What was the profit margin?"
+    answer_contract: abstain_or_clarify
+    verified_result: {value: null}
+    explanation: "I cannot answer: the dataset has no cost column, so margin is not computable."
+    human: {groundedness: 2, provenance: 1, usefulness: 2, uncertainty: 2}
+
+  - id: h06  # verbose, still grounded (concision penalty)
+    question: "What is the average price?"
+    answer_contract: numeric_scalar
+    verified_result: {value: 81.25}
+    explanation: >
+      After careful and extensive consideration of the dataset and its many
+      nuances across all of the rows and columns present, and having reflected at
+      length on the appropriate methodology, the average of the price column is
+      computed to be 81.25 which is the mean value across the non-null entries.
+    human: {groundedness: 2, provenance: 2, usefulness: 1, uncertainty: 0}
+
+  - id: h07  # overconfident despite ambiguity
+    question: "Which region has the highest total price?"
+    answer_contract: categorical_scalar
+    verified_result: {value: "south", ambiguous: true}
+    explanation: "The region column shows south is definitively and certainly the highest, no question."
+    human: {groundedness: 2, provenance: 2, usefulness: 1, uncertainty: 0}
+
+  - id: h08  # terse but grounded
+    question: "How many distinct regions?"
+    answer_contract: integer_scalar
+    verified_result: {value: 3}
+    explanation: "3, the distinct count of the region column."
+    human: {groundedness: 2, provenance: 2, usefulness: 2, uncertainty: 0}
+
+  - id: h09  # empty / no explanation
+    question: "What is the total units?"
+    answer_contract: numeric_scalar
+    verified_result: {value: 26}
+    explanation: ""
+    human: {groundedness: 0, provenance: 0, usefulness: 0, uncertainty: 0}
+
+  - id: h10  # partially grounded, mentions approximation
+    question: "What is the average units?"
+    answer_contract: numeric_scalar
+    verified_result: {value: 3.25}
+    explanation: "The result value is approximately 3.25 over the relevant column."
+    human: {groundedness: 2, provenance: 1, usefulness: 2, uncertainty: 1}
+
+  - id: h11  # contradicts the computed result
+    question: "What is the total price?"
+    answer_contract: numeric_scalar
+    verified_result: {value: 650.0}
+    explanation: "The result was guessed and is probably no idea what it actually is."
+    human: {groundedness: 0, provenance: 0, usefulness: 0, uncertainty: 1}
+
+  - id: h12  # grounded abstention on unsupported question
+    question: "Predict next month's sales."
+    answer_contract: abstain_or_clarify
+    verified_result: {value: null}
+    explanation: "I cannot answer this; forecasting is a limitation of this bounded analysis."
+    human: {groundedness: 1, provenance: 0, usefulness: 2, uncertainty: 2}

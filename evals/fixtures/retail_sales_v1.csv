@@ -1,0 +1,41 @@
+order_id,order_date,region,category,product,quantity,unit_price,discount,customer_id
+ORD-1001,2024-01-05,North,Electronics,Laptop,1,1200.00,0.10,C001
+ORD-1002,2024-01-12,South,Furniture,Desk,2,350.00,0.00,C002
+ORD-1003,2024-01-18,East,Office Supplies,Paper Ream,10,4.50,,C003
+ORD-1004,2024-01-25,West,Electronics,Monitor,2,220.00,0.05,C004
+ORD-1005,2024-02-02,North,Furniture,Office Chair,4,150.00,0.15,C005
+ORD-1006,2024-02-09,South,Electronics,Keyboard,5,45.00,0.00,C001
+ORD-1007,2024-02-14,East,Furniture,Bookshelf,1,180.00,,C006
+ORD-1008,2024-02-21,West,Office Supplies,Stapler,6,12.00,0.00,C007
+ORD-1009,2024-03-01,North,Electronics,Laptop,1,1150.00,0.00,C008
+ORD-1010,2024-03-06,South,Office Supplies,Ink Cartridge,3,28.00,0.10,C002
+ORD-1011,2024-03-11,East,Electronics,Monitor,3,210.00,0.00,C009
+ORD-1012,2024-03-15,West,Furniture,Desk,1,375.00,0.20,C010
+ORD-1013,2024-03-22,North,Office Supplies,Paper Ream,20,4.25,0.05,C011
+ORD-1014,2024-03-29,South,Furniture,Office Chair,2,165.00,0.00,C012
+ORD-1015,2024-04-04,West,Electronics,Laptop,2,1250.00,0.10,C013
+ORD-1016,2024-04-09,North,Office Supplies,Notebook Pack,8,9.50,0.00,C014
+ORD-1017,2024-04-16,East,Electronics,Keyboard,4,48.00,,C003
+ORD-1018,2024-04-23,West,Furniture,Standing Desk,2,540.00,0.05,C015
+ORD-1019,2024-05-02,South,Electronics,Monitor,2,230.00,0.00,C016
+ORD-1020,2024-05-08,West,Electronics,Laptop,1,1300.00,0.00,C013
+ORD-1021,2024-05-14,North,Furniture,Bookshelf,2,175.00,0.10,C017
+ORD-1022,2024-05-21,East,Office Supplies,Stapler,4,11.50,0.00,C018
+ORD-1023,2024-05-28,,Electronics,Webcam,3,85.00,0.00,C019
+ORD-1024,2024-06-03,West,Office Supplies,Ink Cartridge,5,27.00,0.10,C020
+ORD-1025,2024-06-10,South,Furniture,Desk,1,340.00,0.00,C021
+ORD-1026,2024-06-17,North,Electronics,Monitor,1,240.00,0.05,C022
+ORD-1027,2024-06-24,West,Furniture,Office Chair,3,155.00,0.00,C015
+ORD-1028,2024-06-28,East,Electronics,Laptop,1,1180.00,0.15,C023
+ORD-1029,2024-07-05,North,Office Supplies,Paper Ream,15,4.40,0.00,C024
+ORD-1030,2024-07-12,South,Electronics,Keyboard,6,42.00,0.05,C012
+ORD-1031,2024-07-19,East,Furniture,Standing Desk,1,560.00,0.00,C025
+ORD-1032,2024-07-26,West,Electronics,Monitor,2,225.00,,C026
+ORD-1033,2024-08-02,North,Furniture,Desk,2,360.00,0.10,C027
+ORD-1034,2024-08-09,South,Office Supplies,Notebook Pack,12,9.00,0.00,C028
+ORD-1035,2024-08-16,East,Electronics,Webcam,4,80.00,0.05,C029
+ORD-1036,2024-08-23,West,Furniture,Bookshelf,3,170.00,0.00,C030
+ORD-1037,2024-09-01,North,Electronics,Laptop,1,1225.00,0.05,C001
+ORD-1038,2024-09-08,South,Furniture,Office Chair,5,148.00,0.10,C031
+ORD-1039,2024-09-15,East,Office Supplies,Ink Cartridge,4,26.50,0.00,C032
+ORD-1040,2024-09-22,West,Electronics,Keyboard,3,46.00,0.00,C007

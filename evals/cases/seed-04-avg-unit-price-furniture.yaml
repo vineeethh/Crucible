@@ -1,0 +1,26 @@
+id: seed-04-avg-unit-price-furniture
+version: 1.0.0
+suite: seed
+status: released
+dataset:
+  id: retail_sales_v1
+  sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+question: "What is the average unit price of Furniture items ordered?"
+answer_contract:
+  kind: numeric_scalar
+  unit: USD
+  canonicalization: "unweighted mean of unit_price over the 13 Furniture rows (not quantity-weighted)"
+oracle:
+  type: numeric_exact_with_tolerance
+  expected: 282.1538
+  abs_tol: 0.01
+  rel_tol: 0.0001
+  reference_artifact: references/case_04_avg_unit_price_furniture.py
+verification:
+  method: "reference program + manual sum check (3668.00 / 13)"
+  verified_by: "project owner, 2026-07-14"
+ambiguity_note: "Row-mean vs quantity-weighted mean is a real ambiguity; the contract pins row-mean. A quantity-weighted answer scores fail — the agent must honor the stated contract."
+secondary_checks: [code_executed, no_network, provenance_present, result_schema_valid]
+policy: {max_attempts: 3, max_wall_seconds: 20, max_cost_usd: 0.03}
+tags: [aggregate, mean, tolerance]
+strongest_oracle_note: "Tier 1 deterministic result oracle (numeric with declared tolerance)."

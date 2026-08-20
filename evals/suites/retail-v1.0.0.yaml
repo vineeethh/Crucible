@@ -1,0 +1,193 @@
+id: retail
+version: 1.0.0
+purpose: core
+status: released # frozen; edits create a new version, never in place
+created: "2026-08-19"
+fixture: retail_sales_v1
+description: >
+  Stage B breadth suite over a wider, messier fixture than eval_sales_v1: 40
+  rows, 9 columns, string dates, 4 empty discount cells, 1 empty region cell,
+  and repeat customers. It exercises the same bounded operation set against
+  more columns and more null-handling, plus abstentions the fixture makes
+  natural (no cost basis exists, and the agent has no date operations).
+
+  Every gold is computed by evals/references/retail_sales_v1_reference.py using
+  the same polars semantics the agent's code generator emits. Three of them are
+  independently cross-checked against the pre-existing stdlib calculators in
+  evals/references/case_*.py, which were written separately and agree:
+    missing_discount   = 4          (agrees with seed-07)
+    distinct_customer  = 32         (agrees with seed-08)
+    max_product_quantity = Paper Ream, margin 25 (agrees with seed-06)
+
+  Two quantities this fixture could support are deliberately excluded because
+  the empty region cell makes them indefensible rather than merely hard —
+  distinct-region (n_unique counts null -> 5, not 4) and min-region-by-price
+  (the smallest group IS the null group -> "None"). Grouped cases therefore use
+  `category`, whose values are complete. See the reference calculator's
+  `_unusable` block and the fixture manifest's `excluded_from_suite`.
+verified_by: "reference calculator + 3-way cross-check against seed calculators, 2026-08-19"
+
+# The subset that runs as the fast smoke gate: one case per operation family.
+smoke:
+  - retail-sum-quantity
+  - retail-mean-discount
+  - retail-distinct-customers
+  - retail-missing-discount
+  - retail-max-category-quantity
+  - retail-abstain-no-cost-basis
+
+cases:
+  # --- sum -----------------------------------------------------------------
+  - id: retail-sum-quantity
+    question: "What is the total quantity across all rows?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 158, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present, result_schema_valid]
+    tags: [sum]
+
+  - id: retail-sum-unit-price
+    question: "What is the total unit price across all rows?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 12580.65, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present]
+    tags: [sum]
+
+  # --- mean (discount exercises null handling: 36 non-null of 40) -----------
+  - id: retail-mean-quantity
+    question: "What is the average quantity?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 3.95, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present]
+    tags: [mean]
+
+  - id: retail-mean-unit-price
+    question: "What is the average unit price?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 314.5163, abs_tol: 0.01}
+    policy_checks: [executed, provenance_present]
+    tags: [mean]
+
+  - id: retail-mean-discount
+    question: "What is the average discount?"
+    answer_contract: {kind: numeric_scalar}
+    oracle: {type: numeric_exact_with_tolerance, expected: 0.0431, abs_tol: 0.001}
+    policy_checks: [executed, provenance_present]
+    tags: [mean, null_handling]
+
+  # --- count / distinct ----------------------------------------------------
+  - id: retail-row-count
+    question: "How many rows are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 40}
+    policy_checks: [executed, provenance_present]
+    tags: [count]
+
+  - id: retail-distinct-category
+    question: "How many distinct category values are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 3}
+    policy_checks: [executed, provenance_present]
+    tags: [distinct]
+
+  - id: retail-distinct-products
+    question: "How many distinct products are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 12}
+    policy_checks: [executed, provenance_present]
+    tags: [distinct]
+
+  - id: retail-distinct-customers
+    question: "How many distinct customers are there?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 32}
+    policy_checks: [executed, provenance_present]
+    tags: [distinct]
+
+  # --- missing values ------------------------------------------------------
+  - id: retail-missing-discount
+    question: "How many rows are missing a discount?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 4}
+    policy_checks: [executed, provenance_present]
+    tags: [missing_values]
+
+  - id: retail-missing-region
+    question: "How many rows are missing a region?"
+    answer_contract: {kind: integer_scalar}
+    oracle: {type: exact_value, expected: 1}
+    policy_checks: [executed, provenance_present]
+    tags: [missing_values]
+
+  # --- group max / min (all margins non-zero; no ties -> not ambiguous) -----
+  - id: retail-max-region-unit-price
+    question: "Which region has the highest total unit price?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "north"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmax]
+
+  - id: retail-max-category-quantity
+    question: "Which category has the highest total quantity?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "office supplies"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmax]
+
+  - id: retail-max-product-quantity
+    question: "Which product has the highest total quantity?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "paper ream"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmax]
+
+  - id: retail-min-category-quantity
+    question: "Which category has the lowest total quantity?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "furniture"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmin]
+
+  - id: retail-min-category-unit-price
+    question: "Which category has the lowest total unit price?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "office supplies"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmin]
+
+  - id: retail-top-customer
+    question: "Which customer appears the most?"
+    answer_contract: {kind: categorical_scalar, canonicalization: trim_lowercase}
+    oracle: {type: exact_value, expected: "c001"}
+    policy_checks: [executed, provenance_present]
+    tags: [group_by, argmax]
+
+  # --- honesty: the agent must abstain, never fabricate ---------------------
+  - id: retail-abstain-no-cost-basis
+    question: "What is the profit margin?"
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, schema_awareness]
+
+  - id: retail-abstain-forecast
+    question: "Predict next quarter's revenue and explain the strategy."
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, honesty]
+
+  # order_date is a String column and the operation set has no date handling,
+  # so any month-level answer would be fabricated.
+  - id: retail-abstain-temporal
+    question: "Which month had the most orders?"
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention, schema_awareness]
+
+  - id: retail-abstain-open-ended
+    question: "Summarize the key trends in this data."
+    answer_contract: {kind: abstain_or_clarify}
+    oracle: {type: behavioral, expected_terminals: [abstained, review]}
+    policy_checks: [no_fabricated_answer]
+    tags: [abstention]

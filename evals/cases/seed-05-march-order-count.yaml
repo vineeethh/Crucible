@@ -1,0 +1,21 @@
+id: seed-05-march-order-count
+version: 1.0.0
+suite: seed
+status: released
+dataset:
+  id: retail_sales_v1
+  sha256: "347e147d4e1f5709250a759f56924c837adc5d24795ded8d8964e6dcc9d6c849"
+question: "How many orders were placed in March 2024?"
+answer_contract:
+  kind: integer_scalar
+oracle:
+  type: exact_value
+  expected: 6
+  reference_artifact: references/case_05_march_order_count.py
+verification:
+  method: "reference program + manual row enumeration (ORD-1009 through ORD-1014)"
+  verified_by: "project owner, 2026-07-14"
+secondary_checks: [code_executed, no_network, provenance_present, result_schema_valid]
+policy: {max_attempts: 3, max_wall_seconds: 20, max_cost_usd: 0.03}
+tags: [date_filter, count]
+strongest_oracle_note: "Tier 1 deterministic result oracle (exact integer)."
