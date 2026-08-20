@@ -23,6 +23,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "server-only": "^0.0.1",
-    "typescript": "^5.7.0"
+    "typescript": "^7.0.2"
   }
 }
