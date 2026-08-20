@@ -1,0 +1,30 @@
+[project]
+name = "crucible-worker"
+version = "0.1.0"
+description = "Async job consumer (arq): dataset profiling, durable runs, sandbox self-check."
+requires-python = ">=3.12"
+dependencies = [
+    "arq>=0.26,<1",
+    "pydantic-settings>=2.6,<3",
+    "crucible-domain",
+    "crucible-application",
+    "crucible-db",
+    "crucible-storage",
+    "crucible-execution",
+    "crucible-agent",
+]
+
+[tool.uv.sources]
+crucible-domain = { workspace = true }
+crucible-application = { workspace = true }
+crucible-db = { workspace = true }
+crucible-storage = { workspace = true }
+crucible-execution = { workspace = true }
+crucible-agent = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crucible_worker"]
