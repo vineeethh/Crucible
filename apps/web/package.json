@@ -19,7 +19,7 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.2.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "server-only": "^0.0.1",
