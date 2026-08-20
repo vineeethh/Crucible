@@ -1,0 +1,65 @@
+# Alert policies as code (master plan Phase 9 / §11.3).
+#
+# These mirror the SLO rules in `crucible.observability.slo` (the SAME
+# thresholds), so the alerting a provider fires on cannot drift from the alerts
+# the app computes and the tests exercise. A provisioner (Cloud Monitoring alert
+# policies / Grafana / OTel) renders these into the concrete backend; the
+# definitions live in VCS and are reviewed like code.
+#
+# Signals come from the observability plane (GET /v1/metrics/*), which is
+# derived from the run telemetry — no raw prompts or data (threat T8).
+
+version: 1
+notification_channels:
+  sev1: [pager]        # page immediately
+  sev2: [pager, chat]
+  sev3: [chat]
+
+policies:
+  - id: sandbox_containment
+    severity: sev1
+    summary: Confirmed sandbox containment breach
+    signal: security.sandbox_containment_breaches
+    condition: "> 0"
+    for: 0m                       # security: no grace period
+    runbook: docs/operations/sandbox-incident-runbook.md
+
+  - id: trace_completeness
+    severity: sev2
+    summary: Fleet trace completeness below SLO
+    signal: reliability.trace_completeness
+    condition: "< 0.99"           # SloThresholds.min_trace_completeness
+    for: 15m
+    runbook: docs/operations/alert-runbook.md#trace-completeness
+
+  - id: technical_completion
+    severity: sev2
+    summary: Technical completion rate below SLO
+    signal: reliability.technical_completion_rate
+    condition: "< 0.80"           # SloThresholds.min_technical_completion
+    for: 15m
+    runbook: docs/operations/alert-runbook.md#technical-completion
+
+  - id: abstention_spike
+    severity: sev3
+    summary: Abstention rate elevated
+    signal: reliability.abstention_rate
+    condition: "> 0.50"           # SloThresholds.max_abstention_rate
+    for: 30m
+    runbook: docs/operations/alert-runbook.md#abstention-spike
+
+  - id: readiness
+    severity: sev1
+    summary: API not ready (a dependency probe is down)
+    signal: probe.readyz_status
+    condition: "!= 200"
+    for: 3m
+    runbook: docs/operations/deployment-runbook.md
+
+  - id: budget_admission_denials
+    severity: sev3
+    summary: Elevated run admission denials (budget exhausted)
+    signal: audit.run_created_denied_rate
+    condition: "> 0.20"
+    for: 30m
+    runbook: docs/operations/efficiency.md

@@ -1,0 +1,36 @@
+# Trivy configuration for the security lane (filesystem + config scan).
+# Fails the build on fixable CRITICAL/HIGH findings; misconfig covers the
+# Dockerfiles, compose, and OpenTofu.
+
+scan:
+  scanners:
+    - vuln
+    - misconfig
+    - secret
+
+severity:
+  - HIGH
+  - CRITICAL
+
+vulnerability:
+  ignore-unfixed: true
+
+misconfiguration:
+  # Local-dev compose intentionally uses plaintext local-only credentials and
+  # relaxed settings; it is never a deployment artifact (see infra/opentofu).
+  # Trivy still scans the production Dockerfiles and OpenTofu.
+  terraform:
+    exclude-downloaded-modules: false
+
+# Directories that are fixtures, build output, or vendored, not shipped code.
+skip-dirs:
+  - "**/node_modules"
+  - "**/.next"
+  - "evals/fixtures"
+  - ".sandbox_runs"
+
+secret:
+  # Synthetic/local-only credentials in compose and examples are expected; the
+  # dedicated gitleaks job scans history for real leaks.
+  disable-rules:
+    - dockerfile-secret

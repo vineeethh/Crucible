@@ -1,0 +1,121 @@
+# Production promotion (master plan Phase 9 §14).
+#
+# Promotes the EXACT image digests that passed staging — no rebuild, so the
+# artifact that reaches users is bit-for-bit the one that was tested and signed.
+# Manual dispatch only, gated by the `production` GitHub environment (required
+# reviewers). Verifies the cosign signature before applying, and rolls back the
+# API traffic split on a failed post-deploy smoke.
+
+name: promote-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_image:
+        description: "API image by digest (REGISTRY/api@sha256:...), as built for staging"
+        required: true
+      worker_image:
+        description: "Worker image by digest (REGISTRY/worker@sha256:...)"
+        required: true
+      git_sha:
+        description: "The commit SHA the images were built from"
+        required: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production # protected: required reviewers approve before this runs
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      API_SERVICE: crucible-prod-api
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP (OIDC)
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      # Refuse to promote an unsigned or tampered image.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - name: Verify image signatures
+        env:
+          API_IMAGE: ${{ inputs.api_image }}
+          WORKER_IMAGE: ${{ inputs.worker_image }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for image in "$API_IMAGE" "$WORKER_IMAGE"; do
+            cosign verify \
+              --certificate-identity-regexp "https://github.com/${REPO}/" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "$image"
+          done
+
+      - name: Run production migration (migrate job)
+        env:
+          API_IMAGE: ${{ inputs.api_image }}
+        run: |
+          set -euo pipefail
+          gcloud run jobs deploy crucible-prod-migrate \
+            --image "$API_IMAGE" \
+            --region "$REGION" --command alembic \
+            --args "-c,packages/db/alembic.ini,upgrade,head" --quiet
+          gcloud run jobs execute crucible-prod-migrate --region "$REGION" --wait
+
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1
+
+      - name: Record current revision for rollback
+        id: current
+        run: |
+          rev=$(gcloud run services describe "$API_SERVICE" --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || echo "")
+          echo "api_revision=$rev" >> "$GITHUB_OUTPUT"
+
+      - name: Apply production stack (promoted digests)
+        working-directory: infra/opentofu/environments/production
+        env:
+          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_project_number: ${{ vars.GCP_PROJECT_NUMBER }}
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_api_image: ${{ inputs.api_image }}
+          TF_VAR_worker_image: ${{ inputs.worker_image }}
+          TF_VAR_git_sha: ${{ inputs.git_sha }}
+          TF_VAR_db_app_user_password: ${{ secrets.DB_APP_USER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          tofu init -backend-config="bucket=${STATE_BUCKET}"
+          tofu apply -auto-approve
+
+      - name: Post-deploy smoke
+        env:
+          API_URL: ${{ vars.PRODUCTION_API_URL }}
+        run: bash scripts/deploy_smoke.sh "$API_URL"
+
+      - name: Rollback on failed smoke
+        if: failure() && steps.current.outputs.api_revision != ''
+        env:
+          PREV_REVISION: ${{ steps.current.outputs.api_revision }}
+        run: |
+          echo "::warning::production smoke failed — rolling back"
+          gcloud run services update-traffic "$API_SERVICE" \
+            --region "$REGION" --to-revisions "${PREV_REVISION}=100" --quiet

@@ -1,0 +1,15 @@
+# Protected paths (master plan §14.2). Replace OWNER with the GitHub handle
+# once the repository is hosted; branch protection + required review make
+# these lines effective.
+#
+# *                      @OWNER
+# /.github/workflows/    @OWNER   # deploy/rollback + security lane
+# /infra/                @OWNER   # IaC, WIF/OIDC, runtime IAM
+# /evals/                @OWNER
+# /evals/baseline.json   @OWNER   # re-baselining changes what "correct" means
+# /docs/security/        @OWNER
+# /docs/adr/             @OWNER   # architectural decisions
+# /packages/db/alembic/  @OWNER   # schema changes (expand/contract review)
+# /scripts/dr_drill.sh   @OWNER   # recovery procedure
+# /.semgrep.yml          @OWNER   # security guardrail rules
+# /trivy.yaml            @OWNER

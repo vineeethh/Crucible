@@ -1,0 +1,175 @@
+# Staging deploy (master plan Phase 9 §14).
+#
+# Protected, credential-bearing workflow. It authenticates to GCP with a
+# short-lived OIDC token (Workload Identity Federation — no long-lived JSON
+# key), builds an image referenced by DIGEST, signs it and attaches an SBOM,
+# runs the migration job as an explicit step, applies the OpenTofu staging
+# stack with the new digest, then runs smoke + canary + a smoke evaluation.
+# Any failure after traffic could shift triggers an automatic rollback to the
+# previously serving revision.
+#
+# Nothing here is trusted from a fork: it runs only on pushes to main and manual
+# dispatch, never on pull_request, so secrets and the deploy identity are never
+# exposed to untrusted code (threat T9).
+
+name: deploy-staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false # never interrupt an in-flight deploy
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Gated on configuration: until a GCP project + Workload Identity Federation
+    # are provisioned and the `GCP_WIF_PROVIDER` repository/environment variable
+    # is set, this job is SKIPPED (not failed), so pushes stay green while PR
+    # validation and the security lane still run. Enabling staging deploys
+    # requires setting these repository *variables* — GCP_WIF_PROVIDER,
+    # GCP_PROJECT_ID, GCP_PROJECT_NUMBER, GCP_REGION, GCP_DEPLOYER_SA,
+    # TF_STATE_BUCKET, STAGING_API_URL — plus the DB_APP_USER_PASSWORD secret and
+    # the `staging` environment's protection rules. See
+    # docs/operations/deployment-runbook.md.
+    if: ${{ vars.GCP_WIF_PROVIDER != '' }}
+    runs-on: ubuntu-latest
+    environment: staging # GitHub environment protection: reviewers + secrets scope
+    permissions:
+      contents: read
+      id-token: write # required to mint the OIDC token for WIF
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      REGISTRY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/crucible-staging-images
+      API_SERVICE: crucible-staging-api
+      WORKER_SERVICE: crucible-staging-worker
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP (OIDC, no static key)
+        id: auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      # Build both targets and capture their immutable digests. Everything
+      # downstream deploys by digest so a rollback is a known-good SHA, never a
+      # moving tag.
+      - name: Build & push API image
+        id: api_image
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ref="${REGISTRY}/api:${COMMIT_SHA}"
+          docker build -f infra/docker/python.Dockerfile --target api \
+            --build-arg GIT_SHA="${COMMIT_SHA}" -t "$ref" .
+          docker push "$ref"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$ref")
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push worker image
+        id: worker_image
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ref="${REGISTRY}/worker:${COMMIT_SHA}"
+          docker build -f infra/docker/python.Dockerfile --target worker \
+            --build-arg GIT_SHA="${COMMIT_SHA}" -t "$ref" .
+          docker push "$ref"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$ref")
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      # Supply-chain evidence: sign the images keylessly (Fulcio/Rekor) and
+      # attach a CycloneDX SBOM. Verified before promotion to production.
+      - name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - name: Install syft (SBOM)
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+      - name: Sign images and attach SBOMs
+        env:
+          API_DIGEST: ${{ steps.api_image.outputs.digest }}
+          WORKER_DIGEST: ${{ steps.worker_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          for digest in "$API_DIGEST" "$WORKER_DIGEST"; do
+            cosign sign --yes "$digest"
+            syft "$digest" -o cyclonedx-json > sbom.json
+            cosign attest --yes --predicate sbom.json --type cyclonedx "$digest"
+          done
+
+      # Expand-phase migration as an explicit step BEFORE the new revision
+      # serves (never on app startup). Contract migrations follow a later,
+      # separate deploy — see docs/operations/migration-runbook.md.
+      - name: Run database migration (migrate job)
+        env:
+          API_DIGEST: ${{ steps.api_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          gcloud run jobs deploy crucible-staging-migrate \
+            --image "$API_DIGEST" \
+            --region "$REGION" --command alembic \
+            --args "-c,packages/db/alembic.ini,upgrade,head" \
+            --quiet
+          gcloud run jobs execute crucible-staging-migrate --region "$REGION" --wait
+
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1
+
+      - name: Record the current revision for rollback
+        id: current
+        run: |
+          set -euo pipefail
+          rev=$(gcloud run services describe "$API_SERVICE" --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)' 2>/dev/null || echo "")
+          echo "api_revision=$rev" >> "$GITHUB_OUTPUT"
+
+      - name: Apply staging stack (digest-pinned)
+        working-directory: infra/opentofu/environments/staging
+        env:
+          STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+          TF_VAR_project_number: ${{ vars.GCP_PROJECT_NUMBER }}
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_api_image: ${{ steps.api_image.outputs.digest }}
+          TF_VAR_worker_image: ${{ steps.worker_image.outputs.digest }}
+          TF_VAR_git_sha: ${{ github.sha }}
+          TF_VAR_db_app_user_password: ${{ secrets.DB_APP_USER_PASSWORD }}
+        run: |
+          set -euo pipefail
+          tofu init -backend-config="bucket=${STATE_BUCKET}"
+          tofu apply -auto-approve
+
+      - name: Smoke + canary + smoke-eval
+        id: verify
+        env:
+          API_URL: ${{ vars.STAGING_API_URL }}
+        run: bash scripts/deploy_smoke.sh "$API_URL"
+
+      # If verification failed after apply, roll the API back to the revision
+      # that was serving before this deploy. Data migrations are expand-only, so
+      # the old revision is compatible with the migrated schema.
+      - name: Rollback on failed verification
+        if: failure() && steps.current.outputs.api_revision != ''
+        env:
+          PREV_REVISION: ${{ steps.current.outputs.api_revision }}
+        run: |
+          echo "::warning::verification failed — rolling back to ${PREV_REVISION}"
+          gcloud run services update-traffic "$API_SERVICE" \
+            --region "$REGION" --to-revisions "${PREV_REVISION}=100" --quiet

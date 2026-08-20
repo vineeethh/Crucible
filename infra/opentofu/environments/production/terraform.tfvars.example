@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars (gitignored) or pass with -var-file. Non-secret
+# values only; secrets (db password) come from a TF_VAR_ env sourced from a
+# secret store, never committed.
+project_id        = "crucible-production-000000"
+project_number    = "000000000000"
+region            = "us-central1"
+github_repository = "OWNER/crucible"
+
+# Set by the deploy workflow from the freshly built, signed image digests:
+# api_image    = "us-central1-docker.pkg.dev/crucible-production-000000/crucible-production-images/api@sha256:..."
+# worker_image = "us-central1-docker.pkg.dev/crucible-production-000000/crucible-production-images/worker@sha256:..."
+# git_sha      = "abc1234"
+api_domain        = "api.crucible.example"

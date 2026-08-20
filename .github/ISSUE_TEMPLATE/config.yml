@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/saiabhinav001/crucible/security/advisories/new
+    about: Report vulnerabilities privately via GitHub Security Advisories — never in a public issue. See SECURITY.md.
+  - name: Question / discussion
+    url: https://github.com/saiabhinav001/crucible/discussions
+    about: For usage questions and open-ended discussion, please use Discussions rather than an issue.

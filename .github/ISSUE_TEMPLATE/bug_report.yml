@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a defect with reproduction steps and expected vs actual behavior.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please do **not** report suspected security
+        vulnerabilities here — see
+        [SECURITY.md](https://github.com/saiabhinav001/crucible/blob/main/SECURITY.md).
+        Use only synthetic/sanitized data in your report; never paste real
+        datasets, credentials, or API keys.
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: Release tag (e.g. v1.0.0) or git SHA (`git rev-parse --short HEAD`).
+      placeholder: v1.0.0 or e4b1760
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - api
+        - worker / agent
+        - sandbox / execution
+        - evaluation / gate
+        - observability
+        - web dashboard
+        - infra / CI-CD
+        - docs
+        - other / unsure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the defect, expected behavior, and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, deterministic steps. Include the command(s) run.
+      placeholder: |
+        1. docker compose up -d
+        2. uv run alembic -c packages/db/alembic.ini upgrade head
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / trace IDs (redacted)
+      description: Paste sanitized output. Redact secrets and dataset contents.
+      render: shell
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Python version, Node version, Docker version, local vs staging.

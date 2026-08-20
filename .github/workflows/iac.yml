@@ -1,0 +1,51 @@
+# Infrastructure-as-code validation (master plan Phase 9).
+#
+# No credentials: format, validate, and security-scan the OpenTofu without ever
+# touching a real project (`-backend=false`, no `plan` against a live account).
+# A real `tofu plan` runs inside the deploy workflow under OIDC.
+
+name: iac
+
+on:
+  pull_request:
+    paths: ["infra/opentofu/**", ".github/workflows/iac.yml"]
+  push:
+    branches: [main]
+    paths: ["infra/opentofu/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  opentofu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1
+      - name: Format check
+        run: tofu fmt -recursive -check -diff
+        working-directory: infra/opentofu
+      - name: Validate every environment
+        run: |
+          set -euo pipefail
+          for env in environments/*/; do
+            echo "== validating $env =="
+            (cd "$env" && tofu init -backend=false -input=false && tofu validate)
+          done
+        working-directory: infra/opentofu
+
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: IaC security scan (Checkov)
+        uses: bridgecrewio/checkov-action@7b972723c44fb3d256283fac96fae5d7c1894bb7 # v12
+        with:
+          directory: infra/opentofu
+          framework: terraform
+          quiet: true
+          soft_fail: false

@@ -1,0 +1,63 @@
+# Manual rollback (master plan Phase 9 §14).
+#
+# Shifts 100% of a service's traffic to a named, previously-deployed revision.
+# Because migrations are expand/contract, the prior revision is compatible with
+# the current (expanded) schema — a code rollback never requires a data
+# rollback (see docs/operations/migration-runbook.md and rollback-runbook.md).
+
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, production]
+      service:
+        description: "Service to roll back"
+        required: true
+        type: choice
+        options: [api, worker]
+      revision:
+        description: "The revision name to shift 100% traffic to"
+        required: true
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }} # protected: reviewers approve a rollback too
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+    steps:
+      - name: Authenticate to GCP (OIDC)
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Shift traffic to the target revision
+        env:
+          PREFIX: crucible-${{ inputs.environment == 'production' && 'prod' || 'staging' }}
+          SERVICE_KIND: ${{ inputs.service }}
+          REVISION: ${{ inputs.revision }}
+        run: |
+          set -euo pipefail
+          service="${PREFIX}-${SERVICE_KIND}"
+          gcloud run services update-traffic "$service" \
+            --region "$REGION" --to-revisions "${REVISION}=100" --quiet
+          echo "Rolled $service to ${REVISION}."

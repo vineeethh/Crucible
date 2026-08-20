@@ -1,0 +1,161 @@
+# PR validation lane: fast, deterministic, no production secrets.
+# NOTE(P9/R11): third-party actions are tag-pinned in Phase 1; full commit-SHA
+# pinning is a scheduled Phase 9 hardening task before any deploy workflow
+# holds credentials.
+
+name: pr-validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - name: Sync workspace (frozen lockfile)
+        run: uv sync --dev --frozen
+      - name: Format check
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+      - name: Type check
+        run: uv run mypy
+      - name: Import boundary contracts (ADR-001)
+        run: uv run lint-imports
+      - name: Unit tests
+        run: uv run pytest -m "not integration"
+      - name: Migration offline SQL check
+        run: uv run alembic -c packages/db/alembic.ini upgrade head --sql
+      - name: Seed-suite reference calculators
+        run: uv run python evals/references/run_all.py
+
+  python-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: crucible
+          POSTGRES_PASSWORD: crucible
+          POSTGRES_DB: crucible
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U crucible -d crucible"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      minio:
+        # bitnami/minio was withdrawn from the public catalog in 2025; the
+        # legacy repo keeps the auto-start-server behavior the service block
+        # relies on. Pinned to a real release tag (:latest is non-reproducible).
+        image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+        env:
+          MINIO_ROOT_USER: crucible
+          MINIO_ROOT_PASSWORD: crucible-local-only
+        ports: ["9000:9000"]
+        options: >-
+          --health-cmd "mc ready local"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://crucible:crucible@localhost:5432/crucible
+      TEST_REDIS_URL: redis://localhost:6379/1
+      S3_ENDPOINT_URL: http://localhost:9000
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - run: uv sync --dev --frozen
+      - name: Apply migrations
+        run: uv run alembic -c packages/db/alembic.ini upgrade head
+      - name: Integration + security tests (live Postgres/Redis/MinIO)
+        run: uv run pytest -m integration
+
+  web-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web typecheck
+      - run: pnpm --filter web build
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build API/worker image reproducibly from uv.lock
+        run: docker build -f infra/docker/python.Dockerfile --target api --build-arg GIT_SHA=${{ github.sha }} .
+
+  sandbox-canaries:
+    # The security-critical gate: build the hardened runner and prove that
+    # hostile programs are contained. Runs on a standard (unprivileged) runner;
+    # the sandbox controls (network_disabled, cap_drop, read_only, resource
+    # limits) do not require a privileged host.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - run: uv sync --dev --frozen
+      - name: Build the sandbox runner image
+        run: docker build -f infra/docker/runner.Dockerfile -t crucible-sandbox-runner:local .
+      - name: Run sandbox canaries + agent/eval E2E (containment + real answers)
+        env:
+          SANDBOX_WORK_ROOT: ${{ github.workspace }}/.sandbox_runs
+        run: uv run pytest -m sandbox -p no:cacheprovider
+      - name: Smoke evaluation gate (candidate vs frozen baseline)
+        run: |
+          uv run python -m crucible.evaluation run \
+            --suite evals/suites/core-v1.1.0.yaml \
+            --baseline evals/baseline.json --smoke --executor docker \
+            --out evals/reports
+      - name: Smoke evaluation gate — retail breadth suite
+        run: |
+          uv run python -m crucible.evaluation run \
+            --suite evals/suites/retail-v1.0.0.yaml \
+            --baseline evals/baseline-retail.json --smoke --executor docker \
+            --out evals/reports
+      - name: Smoke evaluation gate — adversarial robustness suite
+        run: |
+          uv run python -m crucible.evaluation run \
+            --suite evals/suites/adversarial-v1.0.0.yaml \
+            --baseline evals/baseline-adversarial.json --smoke --executor docker \
+            --out evals/reports
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: eval-report
+          path: evals/reports/*.json
+          if-no-files-found: ignore

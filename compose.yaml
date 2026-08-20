@@ -1,0 +1,134 @@
+# Crucible local development stack (NOT production IaC — see infra/opentofu).
+#   Core stack:        docker compose up -d
+#   With web UI:       docker compose --profile full up -d
+#   Apply migrations:  docker compose run --rm migrate
+# Image tags are version-pinned where upstream tags are stable; digest pinning
+# is a Phase 9 hardening task (risk R11).
+
+name: crucible
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: crucible
+      POSTGRES_PASSWORD: crucible          # local-only credential
+      POSTGRES_DB: crucible
+    # Host port offset: many machines run a native Postgres on 5432.
+    ports: ["55432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crucible -d crucible"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest               # TODO(P9): pin release tag via Renovate
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: crucible
+      MINIO_ROOT_PASSWORD: crucible-local-only
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [miniodata:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./infra/compose/otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports: ["4317:4317", "4318:4318"]
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/python.Dockerfile
+      target: api
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    environment:
+      CRUCIBLE_PROFILE: local
+      DATABASE_URL: postgresql+psycopg://crucible:crucible@postgres:5432/crucible
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000 # server-to-server
+      S3_PUBLIC_ENDPOINT_URL: http://localhost:9000 # what presigned URLs must use
+      S3_ACCESS_KEY: crucible
+      S3_SECRET_KEY: crucible-local-only
+      GIT_SHA: ${GIT_SHA:-unknown}
+    # Host port offset: 8000 is a common default for other local services.
+    ports: ["8100:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz',timeout=3).status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/python.Dockerfile
+      target: worker
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    environment:
+      CRUCIBLE_PROFILE: local
+      DATABASE_URL: postgresql+psycopg://crucible:crucible@postgres:5432/crucible
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: crucible
+      S3_SECRET_KEY: crucible-local-only
+      GIT_SHA: ${GIT_SHA:-unknown}
+    depends_on:
+      redis: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "arq", "--check", "crucible_worker.main.WorkerSettings"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/docker/python.Dockerfile
+      target: migrate
+    profiles: ["tools"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://crucible:crucible@postgres:5432/crucible
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    profiles: ["full"]
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8100
+    ports: ["3100:3000"]
+    depends_on:
+      api: {condition: service_healthy}
+
+volumes:
+  pgdata:
+  miniodata:
