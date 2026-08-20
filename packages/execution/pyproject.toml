@@ -1,0 +1,21 @@
+[project]
+name = "crucible-execution"
+version = "0.1.0"
+description = "Constrained execution: fixed protocol, hardened runner client, artifact parser."
+requires-python = ">=3.12"
+dependencies = ["crucible-domain"]
+
+[project.optional-dependencies]
+# The Docker backend is local-development only (ADR-003). Kept optional so the
+# protocol, fake executor, and parser import cleanly with no Docker present.
+docker = ["docker>=7.1,<8"]
+
+[tool.uv.sources]
+crucible-domain = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crucible"]
