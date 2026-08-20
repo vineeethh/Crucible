@@ -1,0 +1,75 @@
+# Crucible's own guardrail rules — architectural invariants that a generic
+# ruleset does not know about. Run alongside the Semgrep registry packs in the
+# security lane. These encode decisions the codebase must not silently regress.
+
+rules:
+  - id: no-app-startup-migrations
+    languages: [python]
+    severity: ERROR
+    message: >
+      Migrations run as an explicit deploy step, never on app startup
+      (plan §5.4). Do not call alembic upgrade from application code.
+    patterns:
+      - pattern-either:
+          - pattern: command.upgrade(...)
+          - pattern: alembic.command.upgrade(...)
+    paths:
+      exclude:
+        - packages/db/alembic/**
+        - tests/**
+        - scripts/**
+
+  - id: no-print-in-library-code
+    languages: [python]
+    severity: WARNING
+    message: >
+      Library/adapter code should log, not print. print() in a service path
+      bypasses structured logging and redaction.
+    pattern: print(...)
+    paths:
+      include:
+        - packages/**
+        - apps/**
+      exclude:
+        - "**/cli.py"
+        - "**/__main__.py"
+
+  - id: no-verify-false-in-provider-calls
+    languages: [python]
+    severity: ERROR
+    message: >
+      TLS verification must never be disabled on an outbound provider/storage
+      call (MITM exposure, threat T7).
+    pattern-either:
+      - pattern: requests.$M(..., verify=False, ...)
+      - pattern: httpx.$M(..., verify=False, ...)
+      - pattern: httpx.Client(..., verify=False, ...)
+      - pattern: httpx.AsyncClient(..., verify=False, ...)
+
+  - id: no-subprocess-shell-true
+    languages: [python]
+    severity: ERROR
+    message: >
+      subprocess with shell=True on interpolated input is a command-injection
+      surface. Pass an argv list and shell=False.
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.run(..., shell=True, ...)
+          - pattern: subprocess.Popen(..., shell=True, ...)
+          - pattern: subprocess.call(..., shell=True, ...)
+    paths:
+      exclude:
+        - tests/**
+
+  - id: dangerouslysetinnerhtml-guard
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >
+      dangerouslySetInnerHTML renders unescaped HTML (XSS, threat T11). Allowed
+      only for the trusted no-flash theme boot script; justify any other use.
+    pattern: dangerouslySetInnerHTML={...}
+    paths:
+      include:
+        - apps/web/**
+      exclude:
+        - apps/web/app/layout.tsx

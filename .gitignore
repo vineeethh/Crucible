@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment & secrets (templates are committed; real values never)
+.env
+.env.local
+.env.*.local
+**/.env.local
+
+# Generated eval reports (committed examples under evals/reports/examples/)
+evals/reports/
+!evals/reports/examples/
+!evals/reports/examples/**
+
+# Per-run sandbox working directories (inputs/outputs for the Docker executor)
+.sandbox_runs/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+
+# OpenTofu / Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+**/terraform.tfvars
+!**/terraform.tfvars.example
+.terraform.lock.hcl
+.env 

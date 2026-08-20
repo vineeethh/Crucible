@@ -1,0 +1,197 @@
+[project]
+name = "crucible-workspace"
+version = "1.0.0"
+description = "Crucible monorepo workspace root (virtual; see packages/ and apps/)"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+dependencies = [
+    "crucible-domain",
+    "crucible-application",
+    "crucible-db",
+    "crucible-security",
+    "crucible-storage",
+    "crucible-execution",
+    "crucible-agent",
+    "crucible-evaluation",
+    "crucible-observability",
+    "crucible-api",
+    "crucible-worker",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "import-linter>=2.1",
+    "pre-commit>=4.0",
+    "docker>=7.1,<8",  # host-side Docker SDK for the sandbox canary suite (local dev)
+]
+
+[tool.uv]
+package = false
+# cryptography >= 49 ships no Intel-Mac (x86_64) wheel, only arm64 — building
+# it from source needs a Rust toolchain + OpenSSL dev headers this machine
+# doesn't have. Pinned below the cutoff so `uv sync` resolves a prebuilt
+# universal2 wheel instead. Local-dev-only workaround; unrelated to Stage A.
+constraint-dependencies = ["cryptography<49"]
+
+[tool.uv.workspace]
+members = [
+    "packages/domain",
+    "packages/application",
+    "packages/db",
+    "packages/security",
+    "packages/storage",
+    "packages/execution",
+    "packages/agent",
+    "packages/evaluation",
+    "packages/observability",
+    "apps/api",
+    "apps/worker",
+]
+
+[tool.uv.sources]
+crucible-domain = { workspace = true }
+crucible-application = { workspace = true }
+crucible-db = { workspace = true }
+crucible-security = { workspace = true }
+crucible-storage = { workspace = true }
+crucible-execution = { workspace = true }
+crucible-agent = { workspace = true }
+crucible-evaluation = { workspace = true }
+crucible-observability = { workspace = true }
+crucible-api = { workspace = true }
+crucible-worker = { workspace = true }
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["packages/*/src", "apps/*/src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "T20"]
+ignore = ["E501"]  # line length handled by formatter
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["T20"]
+"evals/references/**" = ["T20"]  # reference calculators intentionally print
+"scripts/**" = ["T20"]  # operator CLIs print their results
+"**/cli.py" = ["T20"]  # the evaluation CLI prints its report summary
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["packages", "apps"]
+mypy_path = [
+    "packages/domain/src",
+    "packages/application/src",
+    "packages/db/src",
+    "packages/security/src",
+    "packages/storage/src",
+    "packages/execution/src",
+    "packages/agent/src",
+    "packages/evaluation/src",
+    "packages/observability/src",
+    "apps/api/src",
+    "apps/worker/src",
+]
+explicit_package_bases = true
+namespace_packages = true
+exclude = ["alembic"]
+
+[[tool.mypy.overrides]]
+module = ["arq.*", "boto3.*", "botocore.*", "docker.*", "yaml.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]  # so security tests can import shared integration fixtures
+markers = [
+    "integration: requires live Postgres/Redis (deselect with -m 'not integration')",
+    "sandbox: requires a Docker daemon and the built runner image (canary suite)",
+    "load: load/soak + resilience game-day drills against the live stack (Phase 9)",
+]
+addopts = "-q"
+
+# ---------------------------------------------------- import boundaries
+# ADR-001 boundary rules, enforced: domain imports nothing but stdlib;
+# application imports only domain + stdlib. Run: uv run lint-imports
+[tool.importlinter]
+root_packages = ["crucible", "crucible_api", "crucible_worker"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "domain is pure (no frameworks, no other layers)"
+type = "forbidden"
+source_modules = ["crucible.domain"]
+forbidden_modules = [
+    "fastapi", "starlette", "pydantic", "pydantic_settings", "sqlalchemy",
+    "alembic", "redis", "arq", "httpx", "boto3", "botocore", "polars", "jwt", "argon2", "docker",
+    "crucible.application", "crucible.db", "crucible.security", "crucible.storage",
+    "crucible.execution", "crucible.agent", "crucible.evaluation", "crucible.observability",
+    "crucible_api", "crucible_worker",
+]
+
+[[tool.importlinter.contracts]]
+name = "application depends only on domain"
+type = "forbidden"
+source_modules = ["crucible.application"]
+forbidden_modules = [
+    "fastapi", "starlette", "pydantic", "pydantic_settings", "sqlalchemy",
+    "alembic", "redis", "arq", "httpx", "boto3", "botocore", "polars", "jwt", "argon2", "docker",
+    "crucible.db", "crucible.security", "crucible.storage", "crucible.execution",
+    "crucible.agent", "crucible.evaluation", "crucible_api", "crucible_worker",
+]
+
+[[tool.importlinter.contracts]]
+name = "observability imports only the domain"
+type = "forbidden"
+source_modules = ["crucible.observability"]
+forbidden_modules = [
+    "crucible.application", "crucible.db", "crucible.security", "crucible.storage",
+    "crucible.execution", "crucible.agent", "crucible.evaluation",
+    "crucible_api", "crucible_worker", "fastapi", "sqlalchemy", "boto3",
+]
+
+[[tool.importlinter.contracts]]
+name = "adapters do not import transport apps"
+type = "forbidden"
+source_modules = ["crucible.db", "crucible.security", "crucible.storage", "crucible.execution", "crucible.agent"]
+forbidden_modules = ["fastapi", "starlette", "crucible_api", "crucible_worker"]
+
+[[tool.importlinter.contracts]]
+name = "adapter packages do not depend on each other"
+type = "forbidden"
+source_modules = ["crucible.security", "crucible.storage", "crucible.execution"]
+forbidden_modules = ["crucible.db"]
+
+[[tool.importlinter.contracts]]
+name = "execution imports only the domain (not other adapters)"
+type = "forbidden"
+source_modules = ["crucible.execution"]
+forbidden_modules = ["crucible.security", "crucible.storage", "crucible.application", "crucible.agent"]
+
+[[tool.importlinter.contracts]]
+name = "agent imports only domain and execution (not other adapters or apps)"
+type = "forbidden"
+source_modules = ["crucible.agent"]
+forbidden_modules = [
+    "crucible.application", "crucible.db", "crucible.security", "crucible.storage",
+    "crucible.evaluation", "crucible_api", "crucible_worker",
+    "fastapi", "starlette", "sqlalchemy", "boto3",
+]
+
+[[tool.importlinter.contracts]]
+name = "evaluation plane is decoupled from the serving plane"
+type = "forbidden"
+source_modules = ["crucible.evaluation"]
+forbidden_modules = [
+    "crucible.application", "crucible.db", "crucible.security", "crucible.storage",
+    "crucible_api", "crucible_worker", "fastapi", "starlette", "sqlalchemy", "boto3", "redis", "arq",
+]

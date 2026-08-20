@@ -1,0 +1,9 @@
+{
+  "name": "crucible-monorepo",
+  "private": true,
+  "scripts": {
+    "typecheck": "npx pnpm -r typecheck",
+    "dev": "npx pnpm --filter web dev",
+    "build": "npx pnpm --filter web build"
+  }
+}

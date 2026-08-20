@@ -1,0 +1,13 @@
+packages:
+  - apps/web
+  - packages/ui
+# sharp is Next's optional image-optimizer native dep; we don't use next/image,
+# so its postinstall build script stays disallowed (deterministic installs).
+allowBuilds:
+  sharp: false
+# Force patched versions of transitive deps flagged by Trivy/advisories
+# (DoS/path-traversal); Dependabot keeps these current thereafter.
+overrides:
+  postcss: ">=8.5.18"
+  sharp: ">=0.35.0"
+  js-yaml: ">=5.2.2"
