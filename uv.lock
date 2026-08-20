@@ -387,6 +387,7 @@ dependencies = [
     { name = "crucible-domain" },
     { name = "crucible-execution" },
     { name = "httpx" },
+    { name = "polars" },
     { name = "pydantic" },
 ]
 
@@ -395,6 +396,7 @@ requires-dist = [
     { name = "crucible-domain", editable = "packages/domain" },
     { name = "crucible-execution", editable = "packages/execution" },
     { name = "httpx", specifier = ">=0.27" },
+    { name = "polars", specifier = ">=1.17,<2" },
     { name = "pydantic", specifier = ">=2.9,<3" },
 ]
 

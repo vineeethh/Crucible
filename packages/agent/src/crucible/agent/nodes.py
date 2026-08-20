@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from crucible.agent import policy
 from crucible.agent.cache import compute_cache_key, config_signature, question_sha256
+from crucible.agent.metamorphic import run_challenges
 from crucible.agent.models.codegen import generate_source  # noqa: F401 (referenced in prompts)
 from crucible.agent.ports import (
     AgentPersistence,
@@ -270,7 +271,7 @@ class AgentNodes:
         ev = state.last_execution
         assert ev is not None
         if ev.ok and ev.result is not None:
-            return NodeResult(Node.VERIFY)
+            return NodeResult(Node.CHALLENGE)
 
         category = FailureCategory(ev.failure_category) if ev.failure_category else None
         fp = policy.fingerprint(ev.code_sha256, ev.failure_category, ev.error_detail)
@@ -296,6 +297,51 @@ class AgentNodes:
         if not policy.is_repairable(category):
             return f"non-repairable failure: {ev.exit_class}"
         return f"repair budget exhausted after {policy.MAX_REPAIRS} attempts ({ev.exit_class})"
+
+    async def challenge(self, state: AgentState) -> NodeResult:
+        """Metamorphic verification (crucible.agent.metamorphic): re-run the
+        SAME already-succeeded program against row-shuffled / column-reordered
+        data and record whether the answer held. Gathers evidence only —
+        verify() decides; a failure here never itself aborts the run, so a
+        transform-execution hiccup can't turn a good answer into a crash."""
+        assert state.code_source is not None and state.last_execution is not None
+        ev = state.last_execution
+        try:
+            state.challenge_results = await run_challenges(
+                executor=self.ctx.executor,
+                run_id=state.run_id,
+                attempt_id=str(state.repair_count + 1),
+                program=ExecutionProgram(state.code_source),
+                dataset=DatasetInput(
+                    filename=self.ctx.dataset.filename,
+                    media_type=self.ctx.dataset.media_type,
+                    sha256=self.ctx.dataset.content_sha256 or "",
+                    content=self.ctx.dataset_bytes,
+                ),
+                limits=self.ctx.limits,
+                baseline_result=ev.result or {},
+            )
+        except Exception as exc:  # noqa: BLE001 - evidence-gathering must not crash the run
+            state.challenge_results = []
+            await self._attempt(
+                state,
+                AttemptRecord(
+                    kind="challenge",
+                    sequence_no=0,
+                    payload={"error": f"{type(exc).__name__}: {exc}"},
+                ),
+            )
+            return NodeResult(Node.VERIFY)
+
+        await self._attempt(
+            state,
+            AttemptRecord(
+                kind="challenge",
+                sequence_no=0,
+                payload={"results": [c.model_dump() for c in state.challenge_results]},
+            ),
+        )
+        return NodeResult(Node.VERIFY)
 
     async def reflect(self, state: AgentState) -> NodeResult:
         assert state.plan is not None and state.code_source is not None and state.last_execution
@@ -361,6 +407,20 @@ class AgentNodes:
         elif uncertain:
             vector.ambiguous = True
             vector.reasons.append(reason)
+
+        vector.metamorphic_checks = state.challenge_results
+        violated = [c for c in state.challenge_results if not c.held]
+        if violated:
+            # A correct program's answer cannot legitimately change under a
+            # row shuffle or column reorder (crucible.agent.metamorphic) — a
+            # violation is direct evidence the program is wrong, needing no
+            # gold answer to say so. Hard gate: same standing as any other
+            # policy failure, never downgraded to merely "ambiguous".
+            vector.policy_ok = False
+            vector.reasons.extend(
+                f"metamorphic check failed ({c.transform}): expected {c.relation}, but {c.detail}"
+                for c in violated
+            )
 
         vector.decision = policy.decide(vector)
         state.verification = vector
@@ -454,6 +514,7 @@ DISPATCH = {
     Node.EXECUTE: "execute",
     Node.OBSERVE: "observe",
     Node.REFLECT: "reflect",
+    Node.CHALLENGE: "challenge",
     Node.VERIFY: "verify",
     Node.HUMAN_REVIEW: "human_review",
     Node.SYNTHESIZE: "synthesize",

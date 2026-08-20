@@ -82,7 +82,7 @@ def test_attempts_are_recorded_for_each_step() -> None:
     p.add_run("r1", question="What is the total amount?", profile=PROFILE)
     drive(p, handler=lambda req: exec_result(value=30.0, columns_used=["amount"]))
     kinds = [a.kind for a in p.attempts]
-    assert kinds == ["route", "plan", "code", "execute", "verify"]
+    assert kinds == ["route", "plan", "code", "execute", "challenge", "verify"]
     plan_attempt = p.attempts[1]
     assert plan_attempt.model_provider == "fake"
 

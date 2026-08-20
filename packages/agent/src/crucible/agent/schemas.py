@@ -189,6 +189,20 @@ class GeneratedCode(BaseModel):
     explanation: str = ""
 
 
+class ChallengeOutcome(BaseModel):
+    """One metamorphic re-execution: the SAME generated program run again
+    against a transformed dataset, checking a relation that needs no gold
+    answer (master plan Tier 2, metric-contract.md's "invariant/metamorphic
+    scorer"). `held=False` means the program's answer changed under a
+    transform that should never have changed it — evidence the program is
+    wrong, independent of what the correct answer actually is."""
+
+    transform: str  # e.g. "row_shuffle", "column_reorder"
+    relation: str  # human-readable statement of what was expected
+    held: bool
+    detail: str = ""
+
+
 class VerificationDecision(StrEnum):
     ANSWER = "answer"
     REVIEW = "review"
@@ -202,7 +216,8 @@ class VerificationVector(BaseModel):
     schema/provenance consistency, and policy compliance. It deliberately does
     not claim the answer is mathematically correct just because code ran
     (master plan §8.3) — that certainty only exists offline against a known
-    reference (Phase 5).
+    reference (Phase 5). `metamorphic_checks` is the exception: a violated
+    invariant IS direct evidence of a wrong program, with no gold needed.
     """
 
     plan_valid: bool = False
@@ -212,6 +227,7 @@ class VerificationVector(BaseModel):
     provenance_present: bool = False
     policy_ok: bool = False
     ambiguous: bool = False  # e.g. a tie in a max-by-group — the data is unclear
+    metamorphic_checks: list[ChallengeOutcome] = Field(default_factory=list)
     decision: VerificationDecision = VerificationDecision.ABSTAIN
     reasons: list[str] = Field(default_factory=list)
 

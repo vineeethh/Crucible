@@ -12,7 +12,7 @@ import asyncio
 
 import pytest
 
-from crucible.agent import ColumnView, FakeModel, run_agent
+from crucible.agent import ColumnView, FakeModel, GeneratedCode, ModelRole, run_agent
 from crucible.execution import ExecutionLimits
 from tests.sandbox.conftest import requires_sandbox
 from tests.support.agent_fakes import InMemoryPersistence
@@ -88,3 +88,46 @@ def test_agent_abstains_when_code_cannot_run(executor) -> None:
     # The planner abstains (no numeric column matches) — no fabricated answer.
     assert outcome == "abstained"
     assert p.results["r1"][0] is None
+
+
+def test_row_order_dependent_program_is_caught_by_the_shuffle_invariant(executor) -> None:
+    """crucible.agent.metamorphic: no gold answer exists for "what is the
+    total amount" other than the one the program itself computes — so the
+    only way to catch a program that is silently WRONG (reads df['amount'][0]
+    instead of actually summing) is to notice its answer changes when it has
+    no legitimate reason to. This deliberately-buggy program runs, produces a
+    plausible-looking scalar, and must still be caught: the CHALLENGE node
+    reruns it against a row-shuffled dataset, gets a different value, and
+    verify() hard-abstains rather than answering with unverified confidence.
+    """
+    buggy_source = (
+        "import polars as pl\n"
+        "import json, os\n"
+        "df = pl.read_csv(os.environ['CRUCIBLE_DATASET_PATH'])\n"
+        "value = float(df['amount'][0])\n"  # first row only — order-dependent, not a sum
+        "with open(os.environ['CRUCIBLE_RESULT_PATH'], 'w') as f:\n"
+        "    json.dump({'value': value, 'operation': 'sum', 'columns_used': ['amount']}, f)\n"
+    )
+    model = FakeModel(scripts={ModelRole.CODER: [GeneratedCode(source=buggy_source)]})
+    p = InMemoryPersistence()
+    p.add_run("r1", question="What is the total amount?", profile=PROFILE, content=CSV)
+
+    outcome = asyncio.run(
+        run_agent(
+            p,
+            model=model,
+            executor=executor,
+            limits=ExecutionLimits(wall_seconds=25),
+            run_id="r1",
+        )
+    )
+
+    assert outcome == "abstained"
+    assert p.results["r1"][0] is None
+    verify_attempts = [a for a in p.attempts if a.kind == "verify"]
+    assert len(verify_attempts) == 1
+    vector = verify_attempts[0].payload
+    assert vector["policy_ok"] is False
+    checks = {c["transform"]: c for c in vector["metamorphic_checks"]}
+    assert checks["row_shuffle"]["held"] is False
+    assert any("metamorphic check failed (row_shuffle)" in r for r in vector["reasons"])

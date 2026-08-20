@@ -151,7 +151,7 @@ def test_miss_then_store_then_hit_skips_the_sandbox() -> None:
     first.add_run("r1", question="What is the total amount?", profile=PROFILE)
     outcome, ex1 = drive(first, cache)
     assert outcome == "answered"
-    assert ex1.calls == 1
+    assert ex1.calls == 3  # execute + 2 metamorphic challenges (row_shuffle, column_reorder)
     kinds = [(a.kind, a.payload.get("outcome")) for a in first.attempts if a.kind == "cache"]
     assert ("cache", "miss") in kinds and ("cache", "store") in kinds
 
@@ -178,7 +178,7 @@ def test_other_tenant_never_hits() -> None:
     other.add_run("r2", question="What is the total amount?", profile=PROFILE)
     other.runs["r2"].organization_id = "org-2"  # different tenant, same question
     _, ex = drive(other, cache, run_id="r2")
-    assert ex.calls == 1  # computed fresh; no cross-tenant replay
+    assert ex.calls == 3  # computed fresh; no cross-tenant replay (execute + 2 challenges)
     assert cache.hits == 0
 
 
@@ -204,7 +204,7 @@ def test_false_hit_is_invalidated_and_recomputed() -> None:
     second.add_run("r2", question="What is the total amount?", profile=PROFILE)
     outcome, ex = drive(second, cache, run_id="r2")
     assert outcome == "answered"
-    assert ex.calls == 1  # recomputed, not served
+    assert ex.calls == 3  # recomputed, not served (execute + 2 challenges)
     assert cache.invalidated  # the suspect entry was removed
     assert any(
         a.kind == "cache" and a.payload.get("outcome") == "false_hit" for a in second.attempts

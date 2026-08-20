@@ -12,7 +12,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from crucible.agent.schemas import AnalysisPlan, Answer, VerificationVector
+from crucible.agent.schemas import AnalysisPlan, Answer, ChallengeOutcome, VerificationVector
 from crucible.execution import ArtifactRef
 
 
@@ -26,6 +26,7 @@ class Node(StrEnum):
     EXECUTE = "execute"
     OBSERVE = "observe"
     REFLECT = "reflect"
+    CHALLENGE = "challenge"
     VERIFY = "verify"
     HUMAN_REVIEW = "human_review"
     SYNTHESIZE = "synthesize"
@@ -94,6 +95,10 @@ class AgentState(BaseModel):
     last_execution: ExecutionEvidence | None = None
     repair_count: int = 0
     fingerprints: list[str] = Field(default_factory=list)  # code+error signatures seen
+
+    # Metamorphic re-executions of the SAME program against transformed
+    # datasets (Node.CHALLENGE), gathered before verify() decides.
+    challenge_results: list[ChallengeOutcome] = Field(default_factory=list)
 
     verification: VerificationVector | None = None
     review_decision: str | None = None  # "approve" | "reject" once a reviewer acts
