@@ -1,0 +1,870 @@
+/*
+ * Crucible design language.
+ *
+ * One stylesheet, imported once at the app root. Everything below derives from
+ * a small set of tokens so the entire product re-themes from a handful of
+ * values and stays consistent across hundreds of screens.
+ *
+ * Principles:
+ *   - Typography carries hierarchy; color communicates state, never decoration.
+ *   - Warm obsidian neutrals with a single amber/copper accent family.
+ *   - 8px spatial rhythm (4px half-step), hairline borders, layered soft depth.
+ *   - Motion is engineered: short, directional, and honest about state change.
+ *   - Dark is the default material; light is a first-class equal. `data-theme`
+ *     on <html> (set by the theme toggle) overrides the OS preference in both
+ *     directions.
+ *   - Status is never conveyed by color alone (WCAG 1.4.1) — every status
+ *     surface pairs color with a text label or glyph.
+ */
+
+/* ================================================================ tokens */
+
+:root {
+  /* --- neutral material (warm obsidian, dark default) --- */
+  --bg: #131110;            /* page — near-black with warmth, never blue */
+  --bg-elev: #1b1815;       /* raised interactive surfaces */
+  --panel: #171412;         /* card / panel material */
+  --inset: #100e0d;         /* wells, code, recessed surfaces */
+  --border: #282320;        /* hairline structure */
+  --border-strong: #3a332d; /* interactive edges */
+  --fg: #ece8e1;            /* primary text — warm soft white */
+  --fg-muted: #a89f93;      /* secondary text */
+  --fg-subtle: #7a7267;     /* tertiary / captions */
+
+  /* --- accent: muted gold / copper. One family, used sparingly. --- */
+  --accent: #d39c55;
+  --accent-hover: #e0ad67;
+  --accent-fg: #1c150c;     /* text on accent fills */
+  --accent-soft: rgba(211, 156, 85, 0.13);
+  --link: #d8a765;
+  --focus: #d39c55;
+
+  /* --- semantic status --- */
+  --ok: #86bd8f;
+  --warn: #d5a04a;
+  --danger: #e2776a;
+  --info: #96aec4;
+  --neutral: #a89f93;
+
+  /* --- geometry --- */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --maxw: 1120px;
+
+  /* --- type --- */
+  --font-sans:
+    -apple-system, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI",
+    system-ui, Inter, Roboto, "Helvetica Neue", sans-serif;
+  --font-display:
+    -apple-system, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI",
+    system-ui, Inter, Roboto, "Helvetica Neue", sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Menlo, Consolas,
+    monospace;
+
+  /* --- depth: layered, soft, warm-tinted; no glow, no harsh edges --- */
+  --shadow-1: 0 1px 2px rgba(8, 6, 4, 0.5);
+  --shadow-2: 0 1px 2px rgba(8, 6, 4, 0.4), 0 4px 16px rgba(8, 6, 4, 0.28);
+  --shadow-3: 0 2px 4px rgba(8, 6, 4, 0.4), 0 12px 40px rgba(8, 6, 4, 0.36);
+
+  /* --- motion: fast, decisive, Apple-adjacent easing --- */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-1: 120ms;  /* hover, press */
+  --dur-2: 200ms;  /* reveal, emphasis */
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f5f2;
+    --bg-elev: #ffffff;
+    --panel: #fffefc;
+    --inset: #f1eee9;
+    --border: #e5e0d8;
+    --border-strong: #d2cbc0;
+    --fg: #221d17;
+    --fg-muted: #6d6559;
+    --fg-subtle: #948b7e;
+    --accent: #9a5b25;
+    --accent-hover: #7f4a1d;
+    --accent-fg: #fdf9f4;
+    --accent-soft: rgba(154, 91, 37, 0.1);
+    --link: #96551f;
+    --focus: #9a5b25;
+    --ok: #26743f;
+    --warn: #8a5b00;
+    --danger: #b3362b;
+    --info: #3d648f;
+    --neutral: #6d6559;
+    --shadow-1: 0 1px 2px rgba(60, 50, 38, 0.1);
+    --shadow-2: 0 1px 2px rgba(60, 50, 38, 0.08), 0 4px 16px rgba(60, 50, 38, 0.08);
+    --shadow-3: 0 2px 4px rgba(60, 50, 38, 0.08), 0 12px 40px rgba(60, 50, 38, 0.12);
+    color-scheme: light;
+  }
+}
+
+/* Explicit user choice wins over the OS preference — both directions. */
+:root[data-theme="light"] {
+  --bg: #f7f5f2;
+  --bg-elev: #ffffff;
+  --panel: #fffefc;
+  --inset: #f1eee9;
+  --border: #e5e0d8;
+  --border-strong: #d2cbc0;
+  --fg: #221d17;
+  --fg-muted: #6d6559;
+  --fg-subtle: #948b7e;
+  --accent: #9a5b25;
+  --accent-hover: #7f4a1d;
+  --accent-fg: #fdf9f4;
+  --accent-soft: rgba(154, 91, 37, 0.1);
+  --link: #96551f;
+  --focus: #9a5b25;
+  --ok: #26743f;
+  --warn: #8a5b00;
+  --danger: #b3362b;
+  --info: #3d648f;
+  --neutral: #6d6559;
+  --shadow-1: 0 1px 2px rgba(60, 50, 38, 0.1);
+  --shadow-2: 0 1px 2px rgba(60, 50, 38, 0.08), 0 4px 16px rgba(60, 50, 38, 0.08);
+  --shadow-3: 0 2px 4px rgba(60, 50, 38, 0.08), 0 12px 40px rgba(60, 50, 38, 0.12);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #131110;
+  --bg-elev: #1b1815;
+  --panel: #171412;
+  --inset: #100e0d;
+  --border: #282320;
+  --border-strong: #3a332d;
+  --fg: #ece8e1;
+  --fg-muted: #a89f93;
+  --fg-subtle: #7a7267;
+  --accent: #d39c55;
+  --accent-hover: #e0ad67;
+  --accent-fg: #1c150c;
+  --accent-soft: rgba(211, 156, 85, 0.13);
+  --link: #d8a765;
+  --focus: #d39c55;
+  --ok: #86bd8f;
+  --warn: #d5a04a;
+  --danger: #e2776a;
+  --info: #96aec4;
+  --neutral: #a89f93;
+  --shadow-1: 0 1px 2px rgba(8, 6, 4, 0.5);
+  --shadow-2: 0 1px 2px rgba(8, 6, 4, 0.4), 0 4px 16px rgba(8, 6, 4, 0.28);
+  --shadow-3: 0 2px 4px rgba(8, 6, 4, 0.4), 0 12px 40px rgba(8, 6, 4, 0.36);
+  color-scheme: dark;
+}
+
+/* ================================================================ base */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+
+/* Keyboard focus is always visible, never ambiguous (WCAG 2.4.7). */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Quiet, consistent scrollbars inside scrolling panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+/* ================================================================ shell */
+
+.cru-skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: var(--space-2) var(--space-4);
+  border-radius: 0 0 var(--radius-sm) 0;
+  font-weight: 600;
+  z-index: 100;
+}
+.cru-skip:focus {
+  left: 0;
+}
+
+.cru-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border-bottom: 1px solid var(--border);
+}
+.cru-header-inner {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.cru-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 650;
+  color: var(--fg);
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.cru-brand:hover {
+  text-decoration: none;
+}
+.cru-brand-mark {
+  color: var(--accent);
+  display: block;
+  flex: none;
+}
+
+.cru-nav {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.cru-nav a {
+  color: var(--fg-muted);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  transition:
+    color var(--dur-1) var(--ease),
+    background-color var(--dur-1) var(--ease);
+}
+.cru-nav a:hover {
+  background: var(--bg-elev);
+  color: var(--fg);
+  text-decoration: none;
+}
+.cru-nav a[aria-current="page"] {
+  color: var(--fg);
+  background: var(--bg-elev);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.cru-main {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-7);
+}
+
+/* ============================================================ page frame */
+
+.cru-page-title {
+  font-size: 1.4rem;
+  font-weight: 650;
+  letter-spacing: -0.022em;
+  margin: 0 0 var(--space-1);
+}
+.cru-page-lede {
+  color: var(--fg-muted);
+  font-size: 0.9375rem;
+  margin: 0 0 var(--space-5);
+  max-width: 64ch;
+}
+
+/* ================================================================ panel */
+
+.cru-panel {
+  margin-top: var(--space-6);
+}
+.cru-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  padding: 0 2px;
+}
+/* Section labels are small, spaced capitals — structure, not shouting. */
+.cru-panel-title {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 620;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0;
+}
+.cru-panel-body {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+  overflow-x: auto;
+}
+.cru-panel-pad {
+  padding: var(--space-4) var(--space-5);
+}
+
+/* ================================================================ table */
+
+.cru-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.cru-table th {
+  text-align: left;
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-subtle);
+  font-size: 0.7rem;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--inset) 55%, var(--panel));
+}
+.cru-table th:first-child {
+  border-top-left-radius: var(--radius);
+}
+.cru-table th:last-child {
+  border-top-right-radius: var(--radius);
+}
+.cru-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.cru-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.cru-table tbody tr {
+  transition: background-color var(--dur-1) var(--ease);
+}
+.cru-table tbody tr:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+/* Numeric data reads in columns — tabular figures, right-optical alignment. */
+.cru-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.cru-empty {
+  padding: var(--space-5);
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ============================================================== metrics */
+
+.cru-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+.cru-metric {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-1);
+  transition:
+    border-color var(--dur-1) var(--ease),
+    box-shadow var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease);
+}
+a.cru-metric {
+  color: inherit;
+  display: block;
+}
+a.cru-metric:hover {
+  text-decoration: none;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+.cru-metric-label {
+  color: var(--fg-subtle);
+  font-size: 0.7rem;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.cru-metric-value {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 620;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  margin-top: var(--space-2);
+  line-height: 1.15;
+}
+.cru-metric-hint {
+  color: var(--fg-subtle);
+  font-size: 0.78rem;
+  margin-top: var(--space-1);
+}
+
+/* =============================================================== badges */
+
+.cru-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+  font-size: 0.76rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.cru-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  flex: none;
+}
+
+.cru-tag {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 520;
+  color: var(--fg-muted);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 8px;
+  margin: 1px 4px 1px 0;
+  white-space: nowrap;
+}
+
+/* ============================================================== callout */
+
+.cru-callout {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+}
+.cru-callout-title {
+  font-weight: 620;
+  font-size: 0.9rem;
+  margin: 0 0 2px;
+}
+.cru-callout-body {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 0.875rem;
+}
+.cru-callout.info {
+  border-left-color: var(--info);
+}
+.cru-callout.warn {
+  border-left-color: var(--warn);
+}
+.cru-callout.danger {
+  border-left-color: var(--danger);
+}
+.cru-callout.ok {
+  border-left-color: var(--ok);
+}
+
+/* ================================================================ forms */
+
+.cru-field {
+  display: block;
+  margin-bottom: var(--space-4);
+  max-width: 560px;
+}
+.cru-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 560;
+  margin-bottom: 6px;
+  color: var(--fg);
+}
+.cru-hint {
+  display: block;
+  color: var(--fg-subtle);
+  font-size: 0.78rem;
+  margin-top: 6px;
+}
+
+.cru-input,
+.cru-select,
+.cru-textarea {
+  width: 100%;
+  background: var(--inset);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px var(--space-3);
+  font: inherit;
+  font-size: 0.9rem;
+  transition:
+    border-color var(--dur-1) var(--ease),
+    background-color var(--dur-1) var(--ease),
+    box-shadow var(--dur-1) var(--ease);
+}
+.cru-input:hover,
+.cru-select:hover,
+.cru-textarea:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-strong));
+}
+.cru-input:focus,
+.cru-select:focus,
+.cru-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--bg-elev);
+}
+.cru-input::placeholder,
+.cru-textarea::placeholder {
+  color: var(--fg-subtle);
+}
+.cru-textarea {
+  min-height: 76px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* ============================================================== buttons */
+
+.cru-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--fg);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 580;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: var(--shadow-1);
+  transition:
+    background-color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease),
+    box-shadow var(--dur-1) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+.cru-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+  text-decoration: none;
+}
+.cru-btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+  box-shadow: none;
+}
+.cru-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cru-btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: transparent;
+}
+.cru-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: transparent;
+}
+
+.cru-btn-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  background: transparent;
+  box-shadow: none;
+}
+.cru-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  border-color: var(--danger);
+}
+
+.cru-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--fg-muted);
+}
+.cru-btn-ghost:hover:not(:disabled) {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border-color: transparent;
+}
+
+.cru-btn-icon {
+  width: 32px;
+  padding: 0;
+}
+
+.cru-btn-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ============================================================ code & kv */
+
+.cru-mono {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  color: var(--fg-muted);
+  font-variant-ligatures: none;
+}
+.cru-pre {
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--fg);
+  margin: 0;
+}
+
+.cru-kv {
+  display: grid;
+  grid-template-columns: minmax(140px, 240px) 1fr;
+  gap: var(--space-2) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  margin: 0;
+  font-size: 0.875rem;
+}
+.cru-kv dt {
+  color: var(--fg-subtle);
+  font-weight: 500;
+}
+.cru-kv dd {
+  margin: 0;
+  word-break: break-word;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================ trace */
+
+.cru-trace {
+  padding: var(--space-4) var(--space-5);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-top: 1px solid var(--border);
+}
+.cru-span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 6px var(--space-2);
+  font-size: 0.84rem;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-1) var(--ease);
+}
+.cru-span:hover {
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+}
+.cru-span-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  opacity: 0.75;
+  flex: none;
+}
+.cru-span-name {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.cru-span-meta {
+  color: var(--fg-subtle);
+  font-size: 0.76rem;
+  margin-left: auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===================================================== loading skeleton */
+
+.cru-skeleton {
+  display: block;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  animation: cru-pulse 1.6s var(--ease) infinite;
+}
+.cru-skeleton + .cru-skeleton {
+  margin-top: var(--space-3);
+}
+@keyframes cru-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ============================================================ utilities */
+
+.cru-toolbar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.cru-muted {
+  color: var(--fg-muted);
+}
+.cru-cluster {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.cru-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-5) 0;
+}
+
+/* =========================================================== responsive */
+
+@media (max-width: 720px) {
+  .cru-header-inner,
+  .cru-main {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  /* Stacked header: brand + toggle first, then the nav as its own scrollable
+     row — never interleaved wrapping. */
+  .cru-header-inner {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+    gap: var(--space-2) var(--space-3);
+  }
+  .cru-brand {
+    order: 1;
+  }
+  .cru-header-inner > button {
+    order: 2;
+    margin-left: auto;
+  }
+  .cru-nav {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .cru-nav a {
+    flex: none;
+  }
+  .cru-kv {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .cru-kv dt {
+    margin-top: var(--space-3);
+  }
+  .cru-page-title {
+    font-size: 1.25rem;
+  }
+}
+
+/* armed everywhere, honored always */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
