@@ -140,6 +140,20 @@ def render_coder(plan_json: str, profile: list[ColumnView]) -> str:
     )
 
 
+def augment_question_for_revision(question: str, critique: str) -> str:
+    """Node.REVISE, plan-target: folds the verifier's critique into the
+    question for one re-planning call, without touching `state.question`
+    itself (still the user's original question everywhere else — cache key,
+    provenance, judge). No cell values are ever in `critique` — it's built
+    from column names, operation names, and profiler stats (policy.py's
+    check_column_semantics/check_plausibility), so this stays inside T2."""
+    return (
+        f"{question}\n\n[A previous attempt at this question was rejected by "
+        f"automated verification: {critique} Reconsider the column choice or "
+        "approach accordingly.]"
+    )
+
+
 def render_repair(prior_code: str, error: str) -> str:
     return (
         "The previous program failed. Fix it. Keep the same contract: read "

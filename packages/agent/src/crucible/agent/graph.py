@@ -22,8 +22,13 @@ from crucible.domain import RunStatus
 logger = logging.getLogger("crucible.agent.graph")
 
 # Bound the number of node steps so a logic bug can never loop forever. The
-# longest legitimate path (with two repairs) is well under this.
-MAX_STEPS = 64
+# longest legitimate path composes three separate, independently-bounded
+# budgets: policy.MAX_REPAIRS execute-crash repairs, policy.MAX_REVISIONS
+# automatic verify()-driven revisions, and policy.MAX_HUMAN_REVISIONS
+# human-resumed revision rounds (each of which gets its own fresh
+# MAX_REVISIONS sub-budget — see nodes.py human_review()). Comfortably above
+# the worst realistic path (well under 100 steps) without being unbounded.
+MAX_STEPS = 200
 
 _TERMINAL_STATUS: dict[TerminalReason, RunStatus] = {
     TerminalReason.ANSWERED: RunStatus.ANSWERED,

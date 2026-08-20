@@ -96,9 +96,12 @@ async def execute_run(ctx: dict[str, Any], run_id: str) -> dict[str, str]:
     return {"result": outcome}
 
 
-async def resolve_run_review(ctx: dict[str, Any], run_id: str, approve: bool) -> dict[str, str]:
-    """Resume a run waiting for a reviewer (approve → synthesize, reject →
-    abstain). Enqueued by the API when a reviewer acts."""
+async def resolve_run_review(
+    ctx: dict[str, Any], run_id: str, decision: str, feedback: str | None = None
+) -> dict[str, str]:
+    """Resume a run waiting for a reviewer (approve -> synthesize, reject ->
+    abstain, revise -> feeds `feedback` back into the plan/code and re-runs
+    verification). Enqueued by the API when a reviewer acts."""
     persistence = SqlAgentPersistence(ctx["session_factory"], ctx["storage"])
     outcome = await resolve_review(
         persistence,
@@ -106,9 +109,10 @@ async def resolve_run_review(ctx: dict[str, Any], run_id: str, approve: bool) ->
         executor=ctx["executor"],
         limits=ctx["limits"],
         run_id=run_id,
-        approve=approve,
+        decision=decision,  # type: ignore[arg-type]  # arq passes plain str; orchestrator validates
+        feedback=feedback,
     )
     if outcome in _TERMINAL_OUTCOMES:
         await _settle_budget(ctx["session_factory"], run_id)
-    logger.info("resolve_run_review: run %s approve=%s -> %s", run_id, approve, outcome)
+    logger.info("resolve_run_review: run %s decision=%s -> %s", run_id, decision, outcome)
     return {"result": outcome}

@@ -136,7 +136,7 @@ async def submit_review(
 ) -> RunOut:
     record = await ResolveRunReview(
         runs=runs, queue=ArqJobQueue(request.app.state.queue_pool), audit=audit
-    )(principal, run_id, approve=body.approve, request_id=request_id)
+    )(principal, run_id, decision=body.decision, feedback=body.feedback, request_id=request_id)
     return RunOut.of(record)
 
 

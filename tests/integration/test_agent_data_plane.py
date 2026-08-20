@@ -102,9 +102,9 @@ def test_review_flow_via_api(client: TestClient, alice: Tenant, worker_ctx: dict
     assert run["answer"] is None
 
     # A reviewer approves through the API; the worker job resumes the graph.
-    resp = client.post(f"/v1/runs/{run_id}/review", headers=alice.auth, json={"approve": True})
+    resp = client.post(f"/v1/runs/{run_id}/review", headers=alice.auth, json={"decision": "approve"})
     assert resp.status_code == 200
-    assert asyncio.run(resolve_run_review(ctx, run_id, True)) == {"result": "answered"}
+    assert asyncio.run(resolve_run_review(ctx, run_id, "approve")) == {"result": "answered"}
 
     run = client.get(f"/v1/runs/{run_id}", headers=alice.auth).json()
     assert run["status"] == "answered"
@@ -116,7 +116,7 @@ def test_review_cannot_be_submitted_for_a_non_review_run(
 ) -> None:
     version_id = ready_version(client, alice, worker_ctx)
     run_id = create_run(client, alice, version_id, "What is the total amount?")
-    resp = client.post(f"/v1/runs/{run_id}/review", headers=alice.auth, json={"approve": True})
+    resp = client.post(f"/v1/runs/{run_id}/review", headers=alice.auth, json={"decision": "approve"})
     assert resp.status_code == 409
     assert resp.json()["type"].endswith("run-not-in-review")
 

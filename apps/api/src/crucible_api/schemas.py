@@ -185,7 +185,10 @@ class AttemptOut(BaseModel):
 
 
 class ReviewIn(BaseModel):
-    approve: bool
+    decision: Literal["approve", "reject", "revise"]
+    # Only meaningful (and only sent to the worker) when decision == "revise":
+    # folded into the plan/code prompt for the automatic retry that follows.
+    feedback: str | None = None
 
 
 # --------------------------------------------------------------- review queue

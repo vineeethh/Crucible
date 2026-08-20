@@ -8,6 +8,7 @@ injects them; nothing here imports infrastructure.
 from __future__ import annotations
 
 import logging
+from typing import Literal
 
 from crucible.agent.errors import AgentError
 from crucible.agent.graph import GraphRunner
@@ -121,10 +122,13 @@ async def resolve_review(
     executor: Executor,
     limits: ExecutionLimits,
     run_id: str,
-    approve: bool,
+    decision: Literal["approve", "reject", "revise"],
+    feedback: str | None = None,
 ) -> str:
     """Resume a run that is waiting for a reviewer. Approve continues to
-    synthesis; reject abstains."""
+    synthesis; reject abstains; revise feeds `feedback` back into the plan or
+    code (nodes.py human_review()/revise()) and re-runs verification — bounded
+    by policy.MAX_HUMAN_REVISIONS so this can't be asked forever."""
     run = await persistence.load_run(run_id)
     if run is None:
         return "not_found"
@@ -136,7 +140,8 @@ async def resolve_review(
         return "no_checkpoint"
     node_value, state_json = checkpoint
     state = AgentState.model_validate_json(state_json)
-    state.review_decision = "approve" if approve else "reject"
+    state.review_decision = decision
+    state.review_feedback = feedback if decision == "revise" else None
 
     moved = await persistence.transition(
         run_id,

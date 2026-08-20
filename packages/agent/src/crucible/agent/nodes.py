@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from crucible.agent import policy
+from crucible.agent import policy, prompts
 from crucible.agent.cache import compute_cache_key, config_signature, question_sha256
 from crucible.agent.metamorphic import run_challenges
 from crucible.agent.models.codegen import generate_source  # noqa: F401 (referenced in prompts)
@@ -306,6 +306,16 @@ class AgentNodes:
         transform-execution hiccup can't turn a good answer into a crash."""
         assert state.code_source is not None and state.last_execution is not None
         ev = state.last_execution
+
+        if (ev.result or {}).get("ambiguous"):
+            # A genuine tie (e.g. two regions with equal totals) has more than
+            # one equally correct answer, and the program's own tie-break
+            # (which one it reports) is legitimately allowed to differ under a
+            # row shuffle — that is not evidence of a bug, it's what "tie"
+            # means. Re-checking would produce a false violation, so skip
+            # rather than let an ambiguous-but-honest result look wrong.
+            return NodeResult(Node.VERIFY)
+
         try:
             state.challenge_results = await run_challenges(
                 executor=self.ctx.executor,
@@ -398,12 +408,20 @@ class AgentNodes:
             ambiguous=bool(result.get("ambiguous")),
         )
 
+        # Reasons are tagged by what would actually fix them: a SEMANTIC
+        # failure means the PLAN's column choice was wrong (Node.REVISE
+        # re-plans); a COMPUTATIONAL failure means the PLAN was fine but the
+        # CODE is wrong (Node.REVISE repairs it). Untagged failures (e.g. a
+        # sandbox policy_violation) are never revised — see below.
+        semantic_reasons: list[str] = []
+        computational_reasons: list[str] = []
+
         contradiction, uncertain, reason = policy.check_column_semantics(
             state.plan, state.profile, self.ctx.dataset.row_count
         )
         if contradiction:
             vector.policy_ok = False
-            vector.reasons.append(reason)
+            semantic_reasons.append(reason)
         elif uncertain:
             vector.ambiguous = True
             vector.reasons.append(reason)
@@ -417,7 +435,7 @@ class AgentNodes:
             # gold answer to say so. Hard gate: same standing as any other
             # policy failure, never downgraded to merely "ambiguous".
             vector.policy_ok = False
-            vector.reasons.extend(
+            computational_reasons.extend(
                 f"metamorphic check failed ({c.transform}): expected {c.relation}, but {c.detail}"
                 for c in violated
             )
@@ -431,7 +449,15 @@ class AgentNodes:
             # for a correct program, not a judgment call. Same hard-gate
             # standing as the metamorphic and anti-fabrication checks.
             vector.policy_ok = False
-            vector.reasons.extend(plausibility_violations)
+            computational_reasons.extend(plausibility_violations)
+
+        if not vector.result_schema_valid:
+            computational_reasons.append("result did not match the declared answer shape")
+        if not vector.provenance_present:
+            computational_reasons.append("result carried no provenance (operation/columns_used)")
+
+        vector.reasons.extend(semantic_reasons)
+        vector.reasons.extend(computational_reasons)
 
         vector.decision = policy.decide(vector)
         state.verification = vector
@@ -441,17 +467,130 @@ class AgentNodes:
 
         if vector.decision is VerificationDecision.ANSWER:
             return NodeResult(Node.SYNTHESIZE)
+
+        # A deliberate abstain from the planner itself: there is no column
+        # choice or code bug to revise — the model already said it can't.
+        if not vector.plan_valid:
+            return self._abstain(state, "verification did not meet the answer threshold")
+
+        revisable = semantic_reasons or computational_reasons
+        if vector.decision is VerificationDecision.ABSTAIN and revisable:
+            target = Node.PLAN if semantic_reasons else Node.CODE
+            fp = policy.revision_fingerprint(
+                state.plan.model_dump_json(), semantic_reasons + computational_reasons
+            )
+            seen_before = fp in state.revision_fingerprints
+            state.revision_fingerprints.append(fp)
+            state.critique_history.append("; ".join(semantic_reasons + computational_reasons))
+            if state.revision_count < policy.MAX_REVISIONS and not seen_before:
+                state.revision_count += 1
+                state.pending_revision_target = target
+                return NodeResult(Node.REVISE)
+            state.pending_revision_target = target
+            state.detail = (
+                "automatic revision budget exhausted"
+                if not seen_before
+                else "the same verification failure recurred after a revision"
+            ) + "; routed to human review"
+            return NodeResult(Node.HUMAN_REVIEW)
+
         if vector.decision is VerificationDecision.REVIEW:
             return NodeResult(Node.HUMAN_REVIEW)
         return self._abstain(state, "verification did not meet the answer threshold")
+
+    async def revise(self, state: AgentState) -> NodeResult:
+        """Re-plan or repair using the accumulated critique
+        (state.critique_history) — reached either automatically from verify()
+        or via a human's "revise" decision (human_review()), which is why the
+        target is read from state rather than passed as an argument: both
+        callers just set `pending_revision_target` and route here."""
+        assert state.plan is not None
+        target = state.pending_revision_target
+        state.pending_revision_target = None
+        critique = "; ".join(state.critique_history) or "verification failed"
+
+        if target is Node.PLAN:
+            question = prompts.augment_question_for_revision(state.question, critique)
+            try:
+                plan, usage = await self.ctx.model.plan(question=question, profile=state.profile)
+            except ValueError as exc:
+                return self._abstain(
+                    state, f"revision planner returned invalid structured output: {exc}"
+                )
+            await self._attempt(
+                state,
+                AttemptRecord(
+                    kind="revise_plan",
+                    sequence_no=state.revision_count,
+                    payload=self._with_route(plan.model_dump(), usage),
+                    model_provider=usage.provider,
+                    model_id=usage.model_id,
+                    cost_usd=usage.cost_usd,
+                ),
+            )
+            if plan.is_abstain:
+                return self._abstain(state, plan.rationale or "revision: the question is not supported")
+            known = {c.name for c in state.profile}
+            missing = [c for c in plan.referenced_columns if c not in known]
+            if missing:
+                return self._abstain(state, f"revision plan referenced unknown columns: {missing}")
+            state.plan = plan
+            return NodeResult(Node.CODE)
+
+        # target is Node.CODE: repair the existing program against the
+        # critique, same shape as reflect()'s crash-repair call but a
+        # SEPARATE budget (revision_count, not repair_count) since this is a
+        # different failure mode — the code ran; verify() judged it wrong.
+        assert state.code_source is not None
+        try:
+            repaired, usage = await self.ctx.model.repair(
+                plan=state.plan,
+                profile=state.profile,
+                prior_code=state.code_source,
+                error=f"The program ran, but verification rejected the answer: {critique}",
+            )
+        except ValueError as exc:
+            return self._abstain(state, f"revision coder returned invalid structured output: {exc}")
+        state.code_source = repaired.source
+        state.code_sha256 = ExecutionProgram(repaired.source).sha256
+        await self._attempt(
+            state,
+            AttemptRecord(
+                kind="revise_code",
+                sequence_no=state.revision_count,
+                payload=self._with_route({"explanation": repaired.explanation}, usage),
+                model_provider=usage.provider,
+                model_id=usage.model_id,
+                cost_usd=usage.cost_usd,
+                source_sha256=state.code_sha256,
+            ),
+        )
+        return NodeResult(Node.EXECUTE)
 
     async def human_review(self, state: AgentState) -> NodeResult:
         if state.review_decision is None:
             # Interrupt: the run waits for a reviewer. The runner persists at
             # this node and stops without finalizing.
             return NodeResult(Node.HUMAN_REVIEW, interrupt=True)
-        if state.review_decision == "approve":
+        decision = state.review_decision
+        state.review_decision = None  # consumed; a later interrupt needs a fresh decision
+        if decision == "approve":
             return NodeResult(Node.SYNTHESIZE)
+        if decision == "revise":
+            if state.human_revision_count >= policy.MAX_HUMAN_REVISIONS:
+                return self._abstain(state, "human revision budget exhausted")
+            state.human_revision_count += 1
+            if state.review_feedback:
+                state.critique_history.append(f"reviewer feedback: {state.review_feedback}")
+            state.review_feedback = None
+            target = state.pending_revision_target or Node.PLAN
+            state.pending_revision_target = target
+            # Fresh human feedback earns a fresh automatic-retry budget rather
+            # than inheriting whatever was left (or exhausted) before this
+            # review — the human's input is new information, not a retry.
+            state.revision_count = 0
+            state.revision_fingerprints = []
+            return NodeResult(Node.REVISE)
         return self._abstain(state, "a reviewer rejected the answer")
 
     async def synthesize(self, state: AgentState) -> NodeResult:
@@ -527,6 +666,7 @@ DISPATCH = {
     Node.REFLECT: "reflect",
     Node.CHALLENGE: "challenge",
     Node.VERIFY: "verify",
+    Node.REVISE: "revise",
     Node.HUMAN_REVIEW: "human_review",
     Node.SYNTHESIZE: "synthesize",
     Node.OUTPUT_GUARD: "output_guard",

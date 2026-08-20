@@ -192,7 +192,7 @@ def test_ambiguous_result_routes_to_review_then_approve() -> None:
             ),
             limits=ExecutionLimits(),
             run_id="r1",
-            approve=True,
+            decision="approve",
         )
     )
     assert resolved == "answered"
@@ -214,7 +214,7 @@ def test_review_rejection_abstains() -> None:
             executor=FakeExecutor(handler=lambda req: exec_result(value="north")),
             limits=ExecutionLimits(),
             run_id="r1",
-            approve=False,
+            decision="reject",
         )
     )
     assert resolved == "abstained"

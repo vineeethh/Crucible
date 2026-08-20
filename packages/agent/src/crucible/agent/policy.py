@@ -28,6 +28,13 @@ from crucible.execution import ArtifactRef
 
 MAX_REPAIRS = 2  # after the initial attempt
 
+# Separate budget from MAX_REPAIRS above: a repair fixes a CRASH (the code
+# didn't run); a revision fixes a VERIFIED-WRONG answer (the code ran, but
+# verify() caught a semantic or computational failure — Node.REVISE). Kept
+# distinct because they're different failure modes with different prompts.
+MAX_REVISIONS = 2  # automatic verify()-driven revisions before routing to a human
+MAX_HUMAN_REVISIONS = 3  # "revise" resumes a human can request before abstaining
+
 # Failure categories a repair may address. Everything else is terminal: a policy
 # denial, injection suspicion, or exhausted budget is never retried with more
 # access (master plan §8.3, failure taxonomy).
@@ -49,6 +56,15 @@ def fingerprint(code_sha256: str, failure_category: str | None, error_detail: st
     """A stable signature for an attempt outcome. If the same code produces the
     same error class twice, repairing again is pointless — abstain instead."""
     basis = f"{code_sha256}|{failure_category}|{(error_detail or '')[:200]}"
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
+
+
+def revision_fingerprint(plan_json: str, reasons: list[str]) -> str:
+    """Same oscillation-guard shape as fingerprint() above, for the
+    verify()-driven revision loop: if the same plan produces the same set of
+    verification failures again after a revision, revising further is
+    pointless — route to a human instead of spinning."""
+    basis = f"{plan_json}|{'|'.join(sorted(reasons))}"
     return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:16]
 
 

@@ -10,7 +10,7 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from crucible.application.ports import (
     AuditEntry,
@@ -283,8 +283,10 @@ class CancelRun:
 
 
 class ResolveRunReview:
-    """A reviewer approves or rejects a run waiting for human review. The agent
-    graph resumes asynchronously (approve → synthesize, reject → abstain)."""
+    """A reviewer approves, rejects, or requests a revision of a run waiting
+    for human review. The agent graph resumes asynchronously (approve ->
+    synthesize, reject -> abstain, revise -> re-plan/re-code with `feedback`
+    folded in, bounded by policy.MAX_HUMAN_REVISIONS)."""
 
     def __init__(self, *, runs: RunRepository, queue: JobQueue, audit: AuditSink) -> None:
         self._runs = runs
@@ -292,7 +294,13 @@ class ResolveRunReview:
         self._audit = audit
 
     async def __call__(
-        self, principal: Principal, run_id: uuid.UUID, *, approve: bool, request_id: str = ""
+        self,
+        principal: Principal,
+        run_id: uuid.UUID,
+        *,
+        decision: Literal["approve", "reject", "revise"],
+        feedback: str | None = None,
+        request_id: str = "",
     ) -> RunRecord:
         if not principal.can(Permission.REVIEW_SUBMIT):
             raise PermissionDenied()
@@ -303,7 +311,9 @@ class ResolveRunReview:
             raise Conflict(
                 f"Run is '{run.status.value}', not awaiting review.", code="run-not-in-review"
             )
-        await self._queue.enqueue("resolve_run_review", str(run.id), approve)
+        await self._queue.enqueue(
+            "resolve_run_review", str(run.id), decision, feedback if decision == "revise" else None
+        )
         await self._audit.record(
             AuditEntry(
                 organization_id=principal.organization_id,
@@ -314,7 +324,7 @@ class ResolveRunReview:
                 target_type="run",
                 target_id=str(run_id),
                 request_id=request_id,
-                metadata={"decision": "approve" if approve else "reject"},
+                metadata={"decision": decision},
             )
         )
         return run

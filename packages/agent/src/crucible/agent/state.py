@@ -28,6 +28,7 @@ class Node(StrEnum):
     REFLECT = "reflect"
     CHALLENGE = "challenge"
     VERIFY = "verify"
+    REVISE = "revise"
     HUMAN_REVIEW = "human_review"
     SYNTHESIZE = "synthesize"
     OUTPUT_GUARD = "output_guard"
@@ -104,7 +105,20 @@ class AgentState(BaseModel):
     challenge_results: list[ChallengeOutcome] = Field(default_factory=list)
 
     verification: VerificationVector | None = None
-    review_decision: str | None = None  # "approve" | "reject" once a reviewer acts
+    review_decision: str | None = None  # "approve" | "reject" | "revise" once a reviewer acts
+    review_feedback: str | None = None  # free text a reviewer supplies with "revise"
+
+    # Verify()-driven revision loop (Node.REVISE): bounded separately from
+    # repair_count/fingerprints above, which are for the execute-crash loop —
+    # a different failure mode (the code CRASHED) from this one (the code RAN
+    # and produced an answer that failed a semantic or computational check).
+    revision_count: int = 0
+    revision_fingerprints: list[str] = Field(default_factory=list)
+    critique_history: list[str] = Field(default_factory=list)  # fed back into PLAN/CODE
+    pending_revision_target: Node | None = None  # PLAN or CODE, set by verify()/human_review()
+    # How many times a human's "revise" has resumed this run — bounded
+    # independently so a human can't be asked to revise forever either.
+    human_revision_count: int = 0
 
     answer: Answer | None = None
     terminal_reason: TerminalReason | None = None
