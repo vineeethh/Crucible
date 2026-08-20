@@ -206,9 +206,10 @@ verifies, and either answers with provenance, abstains truthfully, or routes to
 human review.
 
 - **Explicit durable graph** (ADR-008): validate → profile → plan → code →
-  execute → observe → repair (bounded, max 2) → verify → synthesize. It
-  checkpoints after every node, so a worker restart resumes from where it left
-  off rather than re-running model calls and sandbox executions.
+  execute → observe → repair (bounded, max 2) → challenge → verify → revise
+  (bounded) → synthesize. It checkpoints after every node, so a worker restart
+  resumes from where it left off rather than re-running model calls and sandbox
+  executions.
 - **Provider-neutral model gateway**: a deterministic `fake` backend (template
   planner/coder — offline, no cloud LLM) and an OpenAI-compatible contract. The
   fake produces *real, correct* answers because the generated code runs for real
@@ -218,9 +219,16 @@ human review.
   can't fix), `waiting_review` (an ambiguous result, e.g. a tie), `cancelled`.
   The answer text is synthesized mechanically from the verified result, so it
   can never claim more than the number.
+- **Layered verification and correction.** Successful execution is not treated
+  as correctness: the agent re-runs code against row-shuffled and
+  column-reordered data, checks deterministic plausibility bounds from the
+  dataset profile, and routes a detected error to a bounded code repair or
+  re-plan. Repeated failures stop at human review; reviewers can approve,
+  reject, or request a bounded revision with feedback.
 - **Proven end to end**: the agent computes real sums, distinct counts, and
-  group-maxima through the actual Docker sandbox; the durable resume, bounded
-  repair, oscillation guard, and review flow are all tested.
+  group-maxima through the actual Docker sandbox; metamorphic and plausibility
+  violations are caught before answer delivery, and durable resume, bounded
+  repair/revision, oscillation guards, and the review flow are all tested.
 
 ```bash
 make sandbox-image                    # build the runner
