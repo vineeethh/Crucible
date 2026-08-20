@@ -7,7 +7,7 @@
 #
 # Local development only (ADR-003); production uses a managed microVM. Digest
 # pinning of the base image is a Phase 9 hardening task.
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # Preinstalled, allowlisted analytical libraries. No compilers, no build tools,
 # nothing that fetches at run time. Polars is a single self-contained wheel.
