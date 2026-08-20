@@ -90,6 +90,42 @@ def test_agent_abstains_when_code_cannot_run(executor) -> None:
     assert p.results["r1"][0] is None
 
 
+def test_implausible_count_exceeding_row_count_is_caught(executor) -> None:
+    """crucible.agent.policy.check_plausibility: a COUNT can never legitimately
+    exceed the dataset's own row_count — that's not a judgment call, it's
+    logically impossible for a correct program. A buggy coder response that
+    hardcodes an inflated count must be caught even though it executes
+    cleanly and even though the metamorphic shuffle/reorder checks (which
+    only compare the program's answer to ITSELF under transform, not to any
+    external fact) would not catch a constant that never changes."""
+    buggy_source = (
+        "import json, os\n"
+        "with open(os.environ['CRUCIBLE_RESULT_PATH'], 'w') as f:\n"
+        "    json.dump({'value': 9999, 'operation': 'count', 'columns_used': []}, f)\n"
+    )
+    model = FakeModel(scripts={ModelRole.CODER: [GeneratedCode(source=buggy_source)]})
+    p = InMemoryPersistence()
+    p.add_run("r1", question="How many rows are there?", profile=PROFILE, content=CSV, row_count=3)
+
+    outcome = asyncio.run(
+        run_agent(
+            p,
+            model=model,
+            executor=executor,
+            limits=ExecutionLimits(wall_seconds=25),
+            run_id="r1",
+        )
+    )
+
+    assert outcome == "abstained"
+    assert p.results["r1"][0] is None
+    verify_attempts = [a for a in p.attempts if a.kind == "verify"]
+    assert len(verify_attempts) == 1
+    vector = verify_attempts[0].payload
+    assert vector["policy_ok"] is False
+    assert any("exceeds the dataset's row_count" in r for r in vector["reasons"])
+
+
 def test_row_order_dependent_program_is_caught_by_the_shuffle_invariant(executor) -> None:
     """crucible.agent.metamorphic: no gold answer exists for "what is the
     total amount" other than the one the program itself computes — so the

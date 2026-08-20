@@ -76,6 +76,7 @@ class InMemoryPersistence:
         content: bytes = b"region,amount\nnorth,10\nsouth,20\n",
         org: str = "org-1",
         version_id: str = "ver-1",
+        row_count: int | None = None,
     ) -> str:
         self.runs[run_id] = _Run(run_id, org, version_id, question)
         key = f"org/{org}/datasets/d/versions/{version_id}.csv"
@@ -86,6 +87,7 @@ class InMemoryPersistence:
             media_type="text/csv",
             filename=f"{version_id}.csv",
             profile=profile,
+            row_count=row_count,
         )
         self.blobs[key] = content
         return run_id

@@ -10,6 +10,7 @@ fact that code ran.
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from collections.abc import Sequence
 
@@ -17,6 +18,7 @@ from crucible.agent.schemas import (
     MONETARY_AGGREGATE_OPS,
     AnalysisPlan,
     AnswerKind,
+    Operation,
     VerificationDecision,
     VerificationVector,
 )
@@ -160,3 +162,90 @@ def check_column_semantics(
         # id. A real edge case may exist; don't hardcode either verdict.
         return False, True, f"{col!r} is identifier-shaped but the plan claims it is monetary"
     return False, True, f"{col!r} looks like an identifier and the plan gives no column_role defending it"
+
+
+# --- Plausibility assertions -------------------------------------------------
+#
+# Deterministic bounds checks against stats the storage-layer profiler already
+# computed at upload time (packages/storage/.../profiler.py) — never a cell
+# value, so this stays host-side only, same as the anti-fabrication guard. A
+# violation is direct evidence the program is wrong: these are logically
+# impossible outcomes (a count bigger than the dataset, a mean outside the
+# column's own observed range), not a judgment call needing a gold answer.
+
+
+def _is_finite_number(value: object) -> bool:
+    # bool is an int subclass but never NaN/Inf, so math.isfinite(bool) is
+    # trivially True — no special-casing needed to avoid a false violation.
+    return isinstance(value, int | float) and math.isfinite(value)
+
+
+def check_plausibility(
+    plan: AnalysisPlan,
+    result: dict[str, object],
+    profile: Sequence[ColumnView],
+    row_count: int | None,
+) -> list[str]:
+    """Returns violation descriptions; empty means every applicable check
+    passed. A check with no stat to compare against (e.g. row_count unknown
+    on the eval-harness path) is skipped, not counted as a pass — silence
+    here is "no evidence either way," not "verified plausible."""
+    violations: list[str] = []
+    value = result.get("value")
+
+    def by_name(name: str | None) -> ColumnView | None:
+        return next((c for c in profile if c.name == name), None) if name else None
+
+    if plan.operation is Operation.COUNT and isinstance(value, int) and row_count is not None:
+        if value > row_count:
+            violations.append(f"count {value} exceeds the dataset's row_count {row_count}")
+
+    if plan.operation is Operation.COUNT_DISTINCT and isinstance(value, int):
+        col = by_name(plan.target_column)
+        if col is not None and col.distinct_count is not None and value > col.distinct_count:
+            violations.append(
+                f"count_distinct {value} exceeds the profiled distinct_count "
+                f"{col.distinct_count} for {plan.target_column!r}"
+            )
+
+    if plan.operation is Operation.MEAN and isinstance(value, int | float) and not isinstance(value, bool):
+        col = by_name(plan.target_column)
+        if col is not None and col.min_value is not None and col.max_value is not None:
+            try:
+                lo, hi = float(col.min_value), float(col.max_value)
+            except ValueError:
+                lo = hi = None
+            if lo is not None and hi is not None:
+                slack = max(abs(lo), abs(hi), 1.0) * 1e-9
+                if not (lo - slack <= float(value) <= hi + slack):
+                    violations.append(
+                        f"mean {value} falls outside {plan.target_column!r}'s "
+                        f"observed range [{lo}, {hi}]"
+                    )
+
+    if plan.answer_kind is AnswerKind.TABLE:
+        table_row_count = result.get("row_count")
+        group_col = by_name(plan.group_column)
+        if (
+            isinstance(table_row_count, int)
+            and group_col is not None
+            and group_col.distinct_count is not None
+            and table_row_count > group_col.distinct_count
+        ):
+            violations.append(
+                f"table has {table_row_count} rows, more than the profiled "
+                f"distinct_count {group_col.distinct_count} of group column "
+                f"{plan.group_column!r}"
+            )
+        rows = result.get("value")
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict):
+                    for cell_key, cell_value in row.items():
+                        if isinstance(cell_value, int | float) and not _is_finite_number(cell_value):
+                            violations.append(f"table cell {cell_key!r} is not finite ({cell_value!r})")
+
+    if isinstance(value, int | float) and not _is_finite_number(value):
+        violations.append(f"value is not finite ({value!r})")
+
+    return violations

@@ -74,6 +74,9 @@ class SqlAgentPersistence(AgentPersistence):
                     name=col["name"],
                     dtype=col["dtype"],
                     distinct_count=col.get("distinct_count"),
+                    null_count=col.get("null_count"),
+                    min_value=col.get("min_value"),
+                    max_value=col.get("max_value"),
                 )
             )
         return DatasetView(

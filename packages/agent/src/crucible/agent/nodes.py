@@ -422,6 +422,17 @@ class AgentNodes:
                 for c in violated
             )
 
+        plausibility_violations = policy.check_plausibility(
+            state.plan, result, state.profile, self.ctx.dataset.row_count
+        )
+        if plausibility_violations:
+            # A count over the row count, a mean outside the column's own
+            # observed range, a NaN — these are logically impossible outcomes
+            # for a correct program, not a judgment call. Same hard-gate
+            # standing as the metamorphic and anti-fabrication checks.
+            vector.policy_ok = False
+            vector.reasons.extend(plausibility_violations)
+
         vector.decision = policy.decide(vector)
         state.verification = vector
         await self._attempt(

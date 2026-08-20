@@ -50,9 +50,12 @@ class ColumnView(BaseModel):
     # value). Optional: populated on the real dataset-load path
     # (apps/worker/agent_runtime.py); left None on eval-harness/fake paths.
     # Never rendered into a prompt — prompts._schema_block prints name+dtype
-    # only — it exists solely for the host-side anti-fabrication guard in
-    # policy.py.
+    # only — it exists solely for host-side checks (policy.py's
+    # anti-fabrication guard and check_plausibility).
     distinct_count: int | None = None
+    null_count: int | None = None
+    min_value: str | None = None  # a clipped repr, per storage.profiler._clip
+    max_value: str | None = None
 
 
 class ExecutionEvidence(BaseModel):
