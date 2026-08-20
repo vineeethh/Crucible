@@ -11,7 +11,7 @@ COPY apps/api ./apps/api
 COPY apps/worker ./apps/worker
 RUN uv sync --frozen --no-dev --no-editable
 
-FROM python:3.12-slim-bookworm AS runtime-base
+FROM python:3.14-slim-bookworm AS runtime-base
 RUN useradd --uid 10001 --create-home crucible
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
